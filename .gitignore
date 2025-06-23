@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.venv/
+venv/
+ENV/
+.env
+
+# Node.js / Bun
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.pnpm-debug.log
+.yarn-integrity
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.bun
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.ropeproject/
+
+# Project specific
+redshift_mcp_log.out
+*.log
+*.db
+*.sqlite3
+
+# AWS
+.aws-sam/
+samconfig.toml
+
+# Distribution / packaging
+.Python
+*.manifest
+*.spec
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environments
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Frontend build
+fe/dist/
+fe/build/
