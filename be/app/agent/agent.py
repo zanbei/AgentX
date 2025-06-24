@@ -4,6 +4,10 @@ import json
 
 from boto3.dynamodb.conditions import Attr
 from strands import Agent, tool
+from strands.models import BedrockModel
+from strands.models.bedrock import BotocoreConfig
+from strands.tools.mcp.mcp_client import MCPClient
+from mcp.client.streamable_http import streamablehttp_client
 
 from enum import Enum
 from typing import Optional, List
@@ -298,15 +302,29 @@ class AgentPOService:
                 # If the tool is another agent, convert it to a Strands tool
                 agent_po = self.get_agent(t.agent_id)
                 tools.append(agent_as_tool(agent_po))
-
-            elif t.type == AgentToolType.mcp:
-                #TODO: Handle MCP tools
-                pass
+            elif t.type == AgentToolType.mcp and t.mcp_server_url:
+                # If the tool is an MCP server, create a Strands MCP client
+                streamable_http_mcp_client = MCPClient(lambda: streamablehttp_client(t.mcp_server_url))
+                streamable_http_mcp_client = streamable_http_mcp_client.start()
+                tools.extend(streamable_http_mcp_client.list_tools_sync())
             else:
                 print(f"Unsupported tool type: {t.type}")
+        
+
+        boto_config = BotocoreConfig(
+            retries={"max_attempts": kwargs['max_attempts'] if 'max_attempts' in kwargs else 10, "mode": "standard"},
+            connect_timeout=kwargs['connect_timeout'] if 'connect_timeout' in kwargs else 10,
+            read_timeout=kwargs['read_timeout'] if 'read_timeout' in kwargs else 900
+        )
+
+        bedrock_model = BedrockModel(
+            model_id=agent.model_id,
+            boto_client_config=boto_config,
+        )
+
         return Agent(
             system_prompt=agent.sys_prompt,
-            model=agent.model_id,
+            model=bedrock_model,
             tools=tools
         )
 
@@ -381,6 +399,19 @@ if __name__ == "__main__":
                     AgentTool(name="current_time", catagory="utilities", desc="Get the current time and date")]) \
         .build()
     
+    agent_with_mcp_tool = AgentPOBuilder() \
+        .set_id(uuid.uuid4().hex) \
+        .set_name("rds_agent") \
+        .set_display_name("AWs RDS Agent") \
+        .set_description("An Agent with RDS MySQL MCP Server") \
+        .set_agent_type(AgentType.plain) \
+        .set_model_provider(ModelProvider.bedrock) \
+        .set_model_id("us.anthropic.claude-3-7-sonnet-20250219-v1:0") \
+        .set_sys_prompt("You are an senior MySQL expert and are proficient at SQL and MySQL operation") \
+        .set_tools([AgentTool(name="", catagory="mysql", desc="MySQL MCP Server that can execute sql and get database and table statistics ", 
+                              type=AgentToolType.mcp, mcp_server_url="http://localhost:3000/mcp") ]) \
+        .build()
+    
     orchestrator = AgentPOBuilder() \
         .set_id(uuid.uuid4().hex) \
         .set_name("orchestrator_agent") \
@@ -412,5 +443,8 @@ if __name__ == "__main__":
     # print("List of Agents:")
     # print(agent_service.list_agents())
 
-    strands_agent = agent_service.build_strands_agent(orchestrator)
-    strands_agent("北京是UTC+8 时区, 请问现在是什么时候?")
+    # strands_agent = agent_service.build_strands_agent(orchestrator)
+    # strands_agent("100*300 等于多少")
+
+    strands_agent_with_mcp_tool = agent_service.build_strands_agent(agent_with_mcp_tool)
+    strands_agent_with_mcp_tool("mydata 数据库中一共有多少张表? 一共有多少行数据?")
