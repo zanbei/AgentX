@@ -269,7 +269,7 @@ def _get_table_statistic(conn: Connection, schema: str, table: str) -> str:
 @click.command()
 @click.option(
     "--transport",
-    type=click.Choice(["stdio", "streaming-http"]),
+    type=click.Choice(["stdio", "http"]),
     default="stdio",
     help="Transport type",
 )
@@ -294,14 +294,15 @@ def run(transport: str, port: int, env_file: str) -> int:
                     raise
 
         anyio.run(arun)
-    elif transport == 'streamable-http':
+    elif transport == 'http':
         session_manager = StreamableHTTPSessionManager(
             app = server,
             json_response = True
         )
         from starlette.applications import Starlette
         from starlette.types import Receive, Scope, Send
-        from starlette.routing import Mount
+        from starlette.routing import Mount, Route
+        from starlette.responses import JSONResponse
         from dotenv import load_dotenv
         import contextlib
 
@@ -309,6 +310,9 @@ def run(transport: str, port: int, env_file: str) -> int:
 
         async def handle_streamable_http(scope: Scope, receive: Receive, send: Send) -> None:
             await session_manager.handle_request(scope, receive, send)
+
+        async def health(request):
+            return JSONResponse({'hello': 'world'})
 
         @contextlib.asynccontextmanager
         async def lifespan(app: Starlette) -> AsyncIterator[None]:
@@ -322,7 +326,8 @@ def run(transport: str, port: int, env_file: str) -> int:
 
         starlette_app = Starlette(
             routes=[
-                Mount("/rs_mcp", app= handle_streamable_http)
+                Mount("/rs_mcp", app= handle_streamable_http),
+                Route("/health", health, methods=["GET"])
             ],
             lifespan= lifespan
         )

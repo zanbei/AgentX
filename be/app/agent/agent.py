@@ -8,6 +8,9 @@ from strands.models import BedrockModel
 from strands.models.bedrock import BotocoreConfig
 from strands.tools.mcp.mcp_client import MCPClient
 from mcp.client.streamable_http import streamablehttp_client
+from ..mcp.mcp import MCPService
+from .event_serializer import EventSerializer
+from ..utils.aws_config import get_aws_region
 
 from enum import Enum
 from typing import Optional, List
@@ -76,14 +79,14 @@ class HttpMCPSerer(object):
 
 class AgentTool(BaseModel):
     name: str
-    catagory: str
+    category: str
     desc:str
     type: AgentToolType = AgentToolType.strands
     mcp_server_url: Optional[str] = None
     agent_id: Optional[str] = None
 
     def __repr__(self):
-        return f"AgentTool(name={self.name}, category={self.catagory}, desc={self.desc}, type={self.type}, " \
+        return f"AgentTool(name={self.name}, category={self.category}, desc={self.desc}, type={self.type}, " \
                f"mcp_server_url={self.mcp_server_url}), agent_id={self.agent_id})"
     
 class AgentPO(BaseModel):
@@ -96,11 +99,12 @@ class AgentPO(BaseModel):
     model_id: str = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
     sys_prompt: str = "You are a helpful assistant."
     tools: List[AgentTool] = []
+    envs: str = ""
 
     def __repr__(self):
         return f"AgentPO(name={self.name}, display_name={self.display_name} description={self.description}, " \
                f"agent_type={self.agent_type}, model_provider={self.model_provider}, " \
-               f"model_id={self.model_id}, sys_prompt={self.sys_prompt}, tools={self.tools})"
+               f"model_id={self.model_id}, sys_prompt={self.sys_prompt}, tools={self.tools}, envs={self.envs})"
 
 
 class AgentPOBuilder:
@@ -142,6 +146,10 @@ class AgentPOBuilder:
     def set_tools(self, tools: List[AgentTool]):
         self._agent_po.tools = tools
         return self
+        
+    def set_envs(self, envs: str):
+        self._agent_po.envs = envs
+        return self
 
     def build(self) -> AgentPO:
         return self._agent_po
@@ -156,8 +164,8 @@ class AgentPOService:
     dynamodb_table_name = "AgentTable"
 
     def __init__(self):
-        self.dynamodb = boto3.resource('dynamodb')
-        pass
+        aws_region = get_aws_region()
+        self.dynamodb = boto3.resource('dynamodb', region_name=aws_region)
 
     def add_agent(self, agent_po: AgentPO):
         """
@@ -182,7 +190,8 @@ class AgentPOService:
                 'model_provider': agent_po.model_provider.value,
                 'model_id': agent_po.model_id,
                 'sys_prompt': agent_po.sys_prompt,
-                'tools': [tool.model_dump_json() for tool in agent_po.tools]  # Convert tools to JSON string
+                'tools': [tool.model_dump_json() for tool in agent_po.tools],  # Convert tools to JSON string
+                'envs': agent_po.envs
             }
         )
 
@@ -242,44 +251,49 @@ class AgentPOService:
         # Check if the item was deleted successfully
         return response.get('ResponseMetadata', {}).get('HTTPStatusCode') == 200
     
-    def stream_chat(self, agent_id: str, user_message: str):
+    async def stream_chat(self, agent_id: str, user_message: str):
         """
         Stream chat messages from an agent.
 
         :param agent_id: The ID of the agent to stream chat from.
         :param user_message: The user's message to send to the agent.
-        :return: A generator that yields chat messages.
+        :return: A generator that yields complete event information.
         """
         agent = self.get_agent(agent_id)
         if not agent:
             raise ValueError(f"Agent with ID {agent_id} not found.")
-        
-        agent_instance = None
-        if agent.agent_type == AgentType.plain:
-            agent_tools = []
-            for tool in agent.tools:
-                try:
-                    module = importlib.import_module(f"strands_tools.{tool.name}")
-                    func = getattr(module, tool.name)
-                    agent_tools.append(func)
-                except (ImportError, AttributeError) as e:
-                    print(f"Error loading tool {tool.name}: {e}")
-            agent_instance = Agent(
-                system_prompt=agent.sys_prompt,
-                model=agent.model_id,
-                tools=agent_tools
-            )
-
-        # Create an Agent instance with the retrieved AgentPO
-        agent_instance = Agent(
-            system_prompt=agent.sys_prompt,
-            model=agent.model_id,
-            tools=agent.tools
-        )
+    
+        agent_instance = self.build_strands_agent(agent)
 
         # Stream the chat response
-        for message in agent_instance.stream_chat(user_message):
-            yield f"data: {message}\n\n"
+        async for message in agent_instance.stream_async(user_message):
+            # print(f"Received message: {message}")
+            msg = EventSerializer.prepare_event_for_serialization(message)
+            print(f"Received message: {msg}")
+            # Return the complete event information instead of just the data field
+            yield message
+
+    def get_all_available_tools(self) -> List[AgentTool]:
+        """
+        Get all available tools from the AgentPOService.
+
+        :return: A list of AgentTool objects.
+        """
+        tools = []
+        for tool in Tools:
+            tools.append(AgentTool(name=tool.name, category=tool.category, desc=tool.desc))
+        
+        # Add Agent tools(Only plain agents)
+        for agent in self.list_agents():
+            if agent.agent_type == AgentType.plain:
+                tools.append(AgentTool(name=agent.name, category="Agent", desc=agent.description, type=AgentToolType.agent, agent_id=agent.id))
+
+        # Add MCP tools
+        mcpService = MCPService()
+        for mcp in mcpService.list_mcp_servers():
+            tools.append(AgentTool(name=mcp.name, category="Mcp", desc=mcp.desc, type=AgentToolType.mcp, mcp_server_url=mcp.host))
+        
+        return tools
 
     def build_strands_agent(self, agent: AgentPO, **kwargs) -> Agent:
         """
@@ -288,14 +302,27 @@ class AgentPOService:
         :param agent: The AgentPO object to build the Strands agent from.
         :return: A Strands Agent instance.
         """
+        # Parse and set environment variables if they exist
+        if agent.envs:
+            for line in agent.envs.strip().split('\n'):
+                if line and '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    if key and value:
+                        print(f"Setting environment variable: {key}")
+                        import os
+                        os.environ[key] = value
 
         tools = []
         for t in agent.tools:
             if t.type == AgentToolType.strands:
                 try:
+                    print(f"tool.name: {t.name}")
                     module = importlib.import_module(f"strands_tools.{t.name}")
-                    func = getattr(module, t.name)
-                    tools.append(func)
+                    # func = getattr(module, t.name)
+                    # tools.append(func)
+                    tools.append(module)
                 except (ImportError, AttributeError) as e:
                     print(f"Error loading tool {t.name}: {e}")
             elif t.type == AgentToolType.agent and t.agent_id:
@@ -340,7 +367,7 @@ class AgentPOService:
             Convert a JSON string to an AgentTool object.
             """
             return AgentTool(name=tool_json['name'],
-                             catagory=tool_json['catagory'],
+                             category=tool_json['category'],
                              desc=tool_json['desc'],
                              type=AgentToolType(tool_json['type']),
                              mcp_server_url=tool_json.get('mcp_server_url', None))
@@ -354,7 +381,8 @@ class AgentPOService:
             model_provider=ModelProvider(item['model_provider']),
             model_id=item['model_id'],
             sys_prompt=item['sys_prompt'],
-            tools=[json_to_agent_tool(json.loads(tool)) for tool in item['tools'] ]
+            tools=[json_to_agent_tool(json.loads(tool)) for tool in item['tools'] ],
+            envs=item.get('envs', '')
         )
     
 
@@ -365,24 +393,187 @@ def agent_as_tool(agent: AgentPO, **kwargs):
 
     @tool(name=agent.name, description=agent.description)
     def agent_tool(query: str):
+        # Parse and set environment variables if they exist
+        if agent.envs:
+            for line in agent.envs.strip().split('\n'):
+                if line and '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    if key and value:
+                        print(f"Setting environment variable: {key}")
+                        import os
+                        os.environ[key] = value
+                        
         tools = []
         for t in agent.tools:
             if t.type == AgentToolType.strands:
                 try:    
                     module = importlib.import_module(f"strands_tools.{t.name}")
-                    func = getattr(module, t.name)
-                    tools.append(func)
+                    tools.append(module)
                 except (ImportError, AttributeError) as e:
                     print(f"Error loading tool {t.name}: {e}")
 
+        boto_config = BotocoreConfig(
+            retries={"max_attempts": kwargs['max_attempts'] if 'max_attempts' in kwargs else 10, "mode": "standard"},
+            connect_timeout=kwargs['connect_timeout'] if 'connect_timeout' in kwargs else 10,
+            read_timeout=kwargs['read_timeout'] if 'read_timeout' in kwargs else 900
+        )
+
+        bedrock_model = BedrockModel(
+            model_id=agent.model_id,
+            boto_client_config=boto_config,
+        )
+
         agent_instance = Agent(
             system_prompt=agent.sys_prompt,
-            model=agent.model_id,
+            model=bedrock_model,
             tools= tools
         )
+
         agent_instance(query)
 
     return agent_tool
+
+# Agent Chat Records
+class ChatRecord(BaseModel):
+    id: str
+    agent_id: str
+    user_message: str
+    create_time: str
+
+# Agent Chat Responses
+class ChatResponse(BaseModel):
+    chat_id: str
+    resp_no: int
+    content: str
+    create_time: str
+
+
+class ChatRecordService:
+    """
+    A service to manage chat records and responses.It allows adding, retrieving, and listing chat records and responses from Amazon DynamoDB.
+    """
+
+    chat_record_table_name = "ChatRecordTable"
+    chat_response_table_name = "ChatResponseTable"
+
+    def __init__(self):
+        aws_region = get_aws_region()
+        self.dynamodb = boto3.resource('dynamodb', region_name=aws_region)
+
+    def add_chat_record(self, record: ChatRecord):
+        """
+        Add a chat record to Amazon DynamoDB.
+
+        :param record: The ChatRecord object to add.
+        :raises ValueError: If a chat record with the same ID already exists.
+        :return: None
+        
+        """
+        if (not record.id):
+            record.id = uuid.uuid4().hex
+        
+        table = self.dynamodb.Table(self.chat_record_table_name)
+        table.put_item(
+            Item={
+                'id': record.id,
+                'agent_id': record.agent_id,
+                'user_message': record.user_message,
+                'create_time': record.create_time
+            }   
+        )
+    
+    def get_chat_record(self, id: str) -> ChatRecord:
+        """
+        Retrieve a chat record by its ID from Amazon DynamoDB.
+
+        :param id: The ID of the chat record to retrieve.
+        :return: A ChatRecord object if found, otherwise None.
+        
+        """
+        table = self.dynamodb.Table(self.chat_record_table_name)
+        response = table.get_item(Key={'id': id})
+
+        if 'Item' in response:
+            item = response['Item']
+            return ChatRecord(id=item['id'], agent_id=item['agent_id'], user_message=item['user_message'], create_time=item['create_time'])
+        return None
+
+    
+    def get_chat_records(self) -> List[ChatRecord]:
+        """
+        Retrieve all chat records from Amazon DynamoDB.
+
+        :return: A list of ChatRecord objects.
+        """
+        table = self.dynamodb.Table(self.chat_record_table_name)
+        response = table.scan(Limit=100)
+        items = response.get('Items', [])
+        if items:
+            return [ChatRecord(id=item['id'], agent_id=item['agent_id'], user_message=item['user_message'], create_time=item['create_time']) for item in items]
+        return []
+    
+    def add_chat_response(self, response: ChatResponse):
+        """
+        Add a chat response to Amazon DynamoDB.
+
+        :param response: The ChatResponse object to add.
+        """
+        table = self.dynamodb.Table(self.chat_response_table_name)
+        table.put_item(
+            Item={
+                'id': response.chat_id,
+                'resp_no': response.resp_no,
+                'content': response.content,
+                'create_time': response.create_time
+            }
+        )
+
+    def get_all_chat_responses(self, chat_id: str) -> List[ChatResponse]:
+        """
+        Retrieve all chat responses for a given chat ID from Amazon DynamoDB.
+
+        :param chat_id: The ID of the chat to retrieve responses for.
+        :return: A list of ChatResponse objects.
+        """
+        table = self.dynamodb.Table(self.chat_response_table_name)
+        response = table.scan(FilterExpression=Attr('id').eq(chat_id))
+        items = response.get('Items', [])
+        if items:
+            return [ChatResponse(chat_id=item['id'], resp_no=item['resp_no'], content=item['content'], create_time=item['create_time']) for item in items]
+        return []
+    
+    def del_chat(self, id: str):
+        """
+        Delete Chat Record and Chat Responses by its ID from Amazon DynamoDB.
+
+        :param id: The ID of the agent to delete.
+        """
+        table = self.dynamodb.Table(self.chat_record_table_name)
+        table.delete_item(Key={'id': id})
+
+        table = self.dynamodb.Table(self.chat_response_table_name)
+        response = table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key('id').eq(id)
+        )
+        
+        items = response['Items']
+        deleted_count = 0
+        
+        # 批量删除项目
+        with table.batch_writer() as batch:
+            for item in items:
+                batch.delete_item(
+                    Key={
+                        'id': item['id'],
+                        'resp_no': item['resp_no']
+                    }
+                )
+                deleted_count += 1
+        print(f"delete chat:{id}, count:{deleted_count}")
+    
+
 
 if __name__ == "__main__":
     # Example usage

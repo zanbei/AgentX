@@ -1,158 +1,170 @@
 # Redshift MCP Server
 
-A Model Context Protocol (MCP) server for Amazon Redshift that enables AI assistants to interact with Redshift databases.
+A Model Context Protocol (MCP) server for Amazon Redshift that enables AI agents to interact with Redshift databases.
 
-## Introduction
+## 🌟 Features
 
-Redshift MCP Server is a Python-based implementation of the [Model Context Protocol](https://github.com/modelcontextprotocol/mcp) that provides tools and resources for interacting with Amazon Redshift databases. It allows AI assistants to:
+- **Dynamic Resources**:
+  - List all schemas in a database
+  - List all tables in a schema
+  - View table DDL information
+  - Get table statistics
 
-- List schemas and tables in a Redshift database
-- Retrieve table DDL (Data Definition Language) scripts
-- Get table statistics
-- Execute SQL queries
-- Analyze tables to collect statistics information
-- Get execution plans for SQL queries
+- **Powerful Tools**:
+  - `execute_sql`: Execute SQL queries on Redshift databases
+  - `analyze_table`: Analyze a table to collect statistics information
+  - `get_execution_plan`: Get the execution plan for a SQL query
 
-## Installation
+- **Multiple Transport Types**:
+  - STDIO for command-line integration
+  - HTTP for network-based integration
+
+## 🏗️ Architecture
+
+The Redshift MCP server follows the Model Context Protocol specification and provides:
+
+- **Resources**: URI-addressable data sources
+- **Tools**: Functions that can be called by AI agents
+- **Transport Layer**: Communication methods (STDIO, HTTP)
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Python 3.13 or higher
+- Python 3.13+
 - Amazon Redshift cluster
 - Redshift credentials (host, port, username, password, database)
 
-### Install from source
+### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/Moonlight-CL/redshift-mcp-server.git
-cd redshift-mcp-server
-
 # Install dependencies
 uv sync
 ```
 
-## Configuration
+### Configuration
 
-The server requires the following environment variables to connect to your Redshift cluster:
+Create a `.env` file with your Redshift connection details:
 
 ```
+# Redshift Configuration
 RS_HOST=your-redshift-cluster.region.redshift.amazonaws.com
 RS_PORT=5439
 RS_USER=your_username
 RS_PASSWORD=your_password
 RS_DATABASE=your_database
-RS_SCHEMA=your_schema  # Optional, defaults to "public"
+RS_SCHEMA=public  # Optional, defaults to "public"
+
+# Server Configuration
+SERVER_PORT=3001
+TRANSPORT_TYPE=streamable-http  # 'stdio' or 'streamable-http'
 ```
 
-You can set these environment variables directly or use a `.env` file.
-
-## Usage
-
-### Starting the server
+### Running the Server
 
 ```bash
-# Start the server
-uv run --with mcp python-dotenv redshift-connector mcp
-mcp run src/redshift_mcp_server/server.py
+# Using STDIO transport
+python -m redshift_mcp_server
+
+# Using HTTP transport
+python -m redshift_mcp_server --transport streamable-http --port 3001
 ```
 
-### Integrating with AI assistants
-
-To use this server with an AI assistant that supports MCP, add the following configuration to your MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "redshift": {
-      "command": "uv",
-      "args": ["--directory", "src/redshift_mcp_server", "run", "server.py"],
-      "env": {
-        "RS_HOST": "your-redshift-cluster.region.redshift.amazonaws.com",
-        "RS_PORT": "5439",
-        "RS_USER": "your_username",
-        "RS_PASSWORD": "your_password",
-        "RS_DATABASE": "your_database",
-        "RS_SCHEMA": "your_schema"
-      }
-    }
-  }
-}
-```
-
-## Features
+## 📚 Usage
 
 ### Resources
 
-The server provides the following resources:
+Access Redshift database information through these resource URIs:
 
 - `rs:///schemas` - Lists all schemas in the database
 - `rs:///{schema}/tables` - Lists all tables in a specific schema
 - `rs:///{schema}/{table}/ddl` - Gets the DDL script for a specific table
-- `rs:///{schema}/{table}/statistic` - Gets statistics for a specific table
+- `rs:///{schema}/{table}/statistics` - Gets statistics for a specific table
 
 ### Tools
 
 The server provides the following tools:
 
-- `execute_sql` - Executes a SQL query on the Redshift cluster
-- `analyze_table` - Analyzes a table to collect statistics information
-- `get_execution_plan` - Gets the execution plan with runtime statistics for a SQL query
+#### execute_sql
 
-## Examples
+Execute SQL queries on Redshift databases.
 
-### Listing schemas
-
-```
-access_mcp_resource("redshift-mcp-server", "rs:///schemas")
+```json
+{
+  "sql": "SELECT * FROM users LIMIT 10"
+}
 ```
 
-### Listing tables in a schema
+#### analyze_table
 
-```
-access_mcp_resource("redshift-mcp-server", "rs:///public/tables")
-```
+Analyze a table to collect statistics information.
 
-### Getting table DDL
-
-```
-access_mcp_resource("redshift-mcp-server", "rs:///public/users/ddl")
-```
-
-### Executing SQL
-
-```
-use_mcp_tool("redshift-mcp-server", "execute_sql", {"sql": "SELECT * FROM public.users LIMIT 10"})
+```json
+{
+  "schema": "public",
+  "table": "users"
+}
 ```
 
-### Analyzing a table
+#### get_execution_plan
 
-```
-use_mcp_tool("redshift-mcp-server", "analyze_table", {"schema": "public", "table": "users"})
-```
+Get the execution plan for a SQL query.
 
-### Getting execution plan
-
-```
-use_mcp_tool("redshift-mcp-server", "get_execution_plan", {"sql": "SELECT * FROM public.users WHERE user_id = 123"})
+```json
+{
+  "sql": "SELECT * FROM users WHERE user_id = 123"
+}
 ```
 
-## Development
-
-### Project structure
+## 🔧 Command-line Options
 
 ```
-redshift-mcp-server/
-├── src/
-│   └── redshift_mcp_server/
-│       ├── __init__.py
-│       └── server.py
+Options:
+  --transport TRANSPORT     Transport type (stdio or streamable-http) (default: stdio)
+  --port PORT               HTTP server port (for streamable-http transport) (default: 3001)
+  --env_file ENV_FILE       Path to .env file (default: .env)
+  --help                    Show this help message and exit
+```
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+redshift/
+├── redshift_mcp_server/
+│   ├── __init__.py
+│   ├── __main__.py
+│   └── server.py
+├── Dockerfile
 ├── pyproject.toml
+├── pyrightconfig.json
 └── README.md
 ```
 
-### Dependencies
+### Adding New Tools
 
-- `mcp[cli]>=1.5.0` - Model Context Protocol SDK
-- `python-dotenv>=1.1.0` - For loading environment variables from .env files
-- `redshift-connector>=2.1.5` - Python connector for Amazon Redshift
+To add a new tool:
+
+1. Edit `redshift_mcp_server/server.py`
+2. Add a new tool definition
+3. Implement the tool's functionality
+4. Update the README with documentation
+
+## 📦 Deployment
+
+For deployment instructions, see the [main deployment guide](../../README-DEPLOYMENT.md).
+
+## 🔗 Dependencies
+
+- **mcp[cli]**: Model Context Protocol SDK
+- **python-dotenv**: Environment variable management
+- **redshift-connector**: Python connector for Amazon Redshift
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

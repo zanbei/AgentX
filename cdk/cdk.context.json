@@ -1,0 +1,70 @@
+{
+  "vpc-provider:account=719135481877:filter.vpc-id=vpc-077681e0339eb1be4:region=us-west-2:returnAsymmetricSubnets=true": {
+    "vpcId": "vpc-077681e0339eb1be4",
+    "vpcCidrBlock": "172.31.0.0/16",
+    "ownerAccountId": "719135481877",
+    "availabilityZones": [],
+    "subnetGroups": [
+      {
+        "name": "Private",
+        "type": "Private",
+        "subnets": [
+          {
+            "subnetId": "subnet-08b609bb428944c12",
+            "cidr": "172.31.96.0/20",
+            "availabilityZone": "us-west-2a",
+            "routeTableId": "rtb-08f087f9670f22d5a"
+          },
+          {
+            "subnetId": "subnet-01c67be589435a1a5",
+            "cidr": "172.31.64.0/20",
+            "availabilityZone": "us-west-2b",
+            "routeTableId": "rtb-08f087f9670f22d5a"
+          },
+          {
+            "subnetId": "subnet-06240c5d89c0326eb",
+            "cidr": "172.31.80.0/20",
+            "availabilityZone": "us-west-2c",
+            "routeTableId": "rtb-03fbb6dad973b2a70"
+          }
+        ]
+      },
+      {
+        "name": "Public",
+        "type": "Public",
+        "subnets": [
+          {
+            "subnetId": "subnet-003108e5d0f7988bf",
+            "cidr": "172.31.16.0/20",
+            "availabilityZone": "us-west-2a",
+            "routeTableId": "rtb-0bc2fc610eb285f9f"
+          },
+          {
+            "subnetId": "subnet-00bfa6049adeac7bb",
+            "cidr": "172.31.32.0/20",
+            "availabilityZone": "us-west-2b",
+            "routeTableId": "rtb-0bc2fc610eb285f9f"
+          },
+          {
+            "subnetId": "subnet-07dea95b63e25cbc4",
+            "cidr": "172.31.0.0/20",
+            "availabilityZone": "us-west-2c",
+            "routeTableId": "rtb-0bc2fc610eb285f9f"
+          },
+          {
+            "subnetId": "subnet-0f92749c0bb3cb084",
+            "cidr": "172.31.48.0/20",
+            "availabilityZone": "us-west-2d",
+            "routeTableId": "rtb-0bc2fc610eb285f9f"
+          }
+        ]
+      }
+    ]
+  },
+  "availability-zones:account=719135481877:region=us-west-2": [
+    "us-west-2a",
+    "us-west-2b",
+    "us-west-2c",
+    "us-west-2d"
+  ]
+}

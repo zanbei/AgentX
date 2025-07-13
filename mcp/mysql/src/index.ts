@@ -83,6 +83,11 @@ async function initServerWithStreamableHttpTransport(
   // Handle DELETE requests for session termination
   app.delete("/mcp", handleSessionRequest);
 
+  // health check
+  app.get("/health", (req, res) => {
+    res.status(200).send("OK");
+  });
+
   app.listen(port);
 }
 

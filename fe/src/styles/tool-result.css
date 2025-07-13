@@ -1,0 +1,123 @@
+/* Tool Result Toggle Styles */
+
+/* Hide the checkbox */
+.tool-result-checkbox {
+  display: none;
+}
+
+/* Style the toggle button */
+.tool-result-toggle-btn {
+  display: inline-block;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  margin: 4px 0;
+  font-size: 14px;
+  color: #333;
+  transition: background-color 0.2s;
+}
+
+.tool-result-toggle-btn:hover {
+  background-color: #e0e0e0;
+}
+
+/* Hide the tool result content by default */
+.tool-result-content {
+  display: none;
+  margin-top: 8px;
+  padding: 8px;
+  border-left: 3px solid #ddd;
+  background-color: #f9f9f9;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Show the tool result content when the checkbox is checked */
+.tool-result-checkbox:checked ~ .tool-result-content {
+  display: block;
+}
+
+/* Change the button text when the checkbox is checked */
+.tool-result-checkbox:checked ~ .tool-result-toggle-btn::after {
+  content: " (Hide)";
+}
+
+.tool-result-checkbox:not(:checked) ~ .tool-result-toggle-btn::after {
+  content: " (Show)";
+}
+
+/* Tool Result Formatted Content Styles */
+.tool-result-formatted {
+  margin: 8px 0;
+}
+
+/* Style for code blocks */
+.tool-result-formatted pre {
+  margin: 0;
+  padding: 12px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.tool-result-formatted code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+/* Format-specific styles */
+.tool-result-formatted[data-format="json"] pre {
+  background-color: #f8f8f8;
+  border-left: 3px solid #2196F3;
+}
+
+.tool-result-formatted[data-format="sql"] pre {
+  background-color: #f8f8f8;
+  border-left: 3px solid #4CAF50;
+}
+
+.tool-result-formatted[data-format="html"] pre {
+  background-color: #f8f8f8;
+  border-left: 3px solid #FF9800;
+}
+
+/* Syntax highlighting classes */
+.language-json .hljs-string {
+  color: #008000;
+}
+
+.language-json .hljs-number {
+  color: #0000ff;
+}
+
+.language-json .hljs-literal {
+  color: #0000ff;
+}
+
+.language-sql .hljs-keyword {
+  color: #0000ff;
+  font-weight: bold;
+}
+
+.language-sql .hljs-string {
+  color: #a31515;
+}
+
+.language-html .hljs-tag {
+  color: #800000;
+}
+
+.language-html .hljs-name {
+  color: #800000;
+}
+
+.language-html .hljs-attr {
+  color: #ff0000;
+}
+
+.language-html .hljs-string {
+  color: #0000ff;
+}
