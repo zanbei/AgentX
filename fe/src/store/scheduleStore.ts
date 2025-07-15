@@ -10,6 +10,7 @@ export interface ScheduleItem {
   status: string;
   createdAt: string;
   updatedAt: string;
+  user_message?: string;
 }
 
 interface ScheduleState {
@@ -27,7 +28,7 @@ interface ScheduleState {
   setCreateModalVisible: (visible: boolean) => void;
   setEditModalVisible: (visible: boolean) => void;
   setSelectedSchedule: (schedule: ScheduleItem | null) => void;
-  createSchedule: (schedule: { agentId: string; cronExpression: string }) => Promise<void>;
+  createSchedule: (schedule: { agentId: string; cronExpression: string; user_message?: string }) => Promise<void>;
   updateSchedule: (schedule: ScheduleItem) => Promise<void>;
   deleteSchedule: (id: string) => Promise<void>;
   handleEditSchedule: (schedule: ScheduleItem) => void;

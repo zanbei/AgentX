@@ -9,7 +9,6 @@ import {
   Form, 
   Input, 
   Select, 
-  message 
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -31,6 +30,7 @@ interface ScheduleItem {
   status: string;
   createdAt: string;
   updatedAt: string;
+  user_message?: string;
 }
 
 export const Schedule: React.FC = () => {
@@ -70,13 +70,14 @@ export const Schedule: React.FC = () => {
     if (selectedSchedule && editModalVisible) {
       editForm.setFieldsValue({
         agentId: selectedSchedule.agentId,
-        cronExpression: selectedSchedule.cronExpression
+        cronExpression: selectedSchedule.cronExpression,
+        user_message: selectedSchedule.user_message
       });
     }
   }, [selectedSchedule, editModalVisible, editForm]);
 
   // Handle create schedule form submission
-  const handleCreateSchedule = async (values: { agentId: string; cronExpression: string }) => {
+  const handleCreateSchedule = async (values: { agentId: string; cronExpression: string; user_message?: string }) => {
     await createSchedule(values);
     form.resetFields();
   };
@@ -88,13 +89,14 @@ export const Schedule: React.FC = () => {
   };
 
   // Handle edit schedule form submission
-  const handleUpdateSchedule = async (values: { agentId: string; cronExpression: string }) => {
+  const handleUpdateSchedule = async (values: { agentId: string; cronExpression: string; user_message?: string }) => {
     if (!selectedSchedule) return;
     
     await updateSchedule({
       ...selectedSchedule,
       agentId: values.agentId,
       cronExpression: values.cronExpression,
+      user_message: values.user_message,
     });
     
     editForm.resetFields();
@@ -199,6 +201,14 @@ export const Schedule: React.FC = () => {
       >
         <Input placeholder="例如: 0 8 ? * 1" />
       </Form.Item>
+      
+      <Form.Item
+        name="user_message"
+        label="Agent消息"
+        help="调度任务执行时发送给Agent的消息"
+      >
+        <Input.TextArea placeholder="请输入要发送给Agent的消息" rows={4} />
+      </Form.Item>
     </Form>
   );
 
@@ -234,6 +244,14 @@ export const Schedule: React.FC = () => {
         help="格式: 分 时 日 月 周 (例如: '0 8 ? * 1' 表示每周一上午8点，日字段必须为?)"
       >
         <Input placeholder="例如: 0 8 ? * 1" />
+      </Form.Item>
+      
+      <Form.Item
+        name="user_message"
+        label="Agent消息"
+        help="调度任务执行时发送给Agent的消息"
+      >
+        <Input.TextArea placeholder="请输入要发送给Agent的消息" rows={4} />
       </Form.Item>
     </Form>
   );

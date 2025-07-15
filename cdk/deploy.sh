@@ -11,8 +11,7 @@ usage() {
   echo "  --vpc-id VPC_ID             Use existing VPC ID instead of creating a new one"
   echo "  --no-mysql-mcp              Disable MySQL MCP server deployment"
   echo "  --no-redshift-mcp           Disable Redshift MCP server deployment"
-  echo "  --no-agentx-stack           Disable AgentX stack deployment"
-  echo "  --only-schedule-stack       Deploy only the Schedule stack"
+  echo "  --no-dynamodb-tables        Disable creation of DynamoDB tables for agent and MCP services"
   echo "  --help                      Display this help message"
   exit 1
 }
@@ -22,8 +21,7 @@ AWS_REGION=$(aws configure get region || echo "us-west-2")
 VPC_ID=""
 DEPLOY_MYSQL_MCP=true
 DEPLOY_REDSHIFT_MCP=true
-DEPLOY_AGENTX_STACK=true
-DEPLOY_SCHEDULE_STACK=true
+CREATE_DYNAMODB_TABLES=true
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -44,13 +42,8 @@ while [[ $# -gt 0 ]]; do
       DEPLOY_REDSHIFT_MCP=false
       shift
       ;;
-    --no-agentx-stack)
-      DEPLOY_AGENTX_STACK=false
-      shift
-      ;;
-    --only-schedule-stack)
-      DEPLOY_AGENTX_STACK=false
-      DEPLOY_SCHEDULE_STACK=true
+    --no-dynamodb-tables)
+      CREATE_DYNAMODB_TABLES=false
       shift
       ;;
     --help)
@@ -75,6 +68,8 @@ if [ -n "$VPC_ID" ]; then
 fi
 echo "MySQL MCP server deployment: $([ "$DEPLOY_MYSQL_MCP" = true ] && echo "Enabled" || echo "Disabled")"
 echo "Redshift MCP server deployment: $([ "$DEPLOY_REDSHIFT_MCP" = true ] && echo "Enabled" || echo "Disabled")"
+echo "DynamoDB tables creation: $([ "$CREATE_DYNAMODB_TABLES" = true ] && echo "Enabled" || echo "Disabled")"
+echo "Agent Schedule functionality: Enabled"
 
 # Bootstrap CDK if not already done
 echo "Checking if CDK is bootstrapped..."
@@ -112,39 +107,23 @@ if [ "$DEPLOY_REDSHIFT_MCP" = false ]; then
   export DEPLOY_REDSHIFT_MCP=false
 fi
 
-if [ "$DEPLOY_AGENTX_STACK" = false ]; then
-  CDK_PARAMS="$CDK_PARAMS -c deployAgentXStack=false"
-  export DEPLOY_AGENTX_STACK=false
-  echo "AgentX stack deployment: Disabled"
-else
-  echo "AgentX stack deployment: Enabled"
+if [ "$CREATE_DYNAMODB_TABLES" = false ]; then
+  CDK_PARAMS="$CDK_PARAMS -c createDynamoDBTables=false"
+  export CREATE_DYNAMODB_TABLES=false
 fi
 
-if [ "$DEPLOY_SCHEDULE_STACK" = false ]; then
-  CDK_PARAMS="$CDK_PARAMS -c deployScheduleStack=false"
-  export DEPLOY_SCHEDULE_STACK=false
-  echo "Schedule stack deployment: Disabled"
-else
-  echo "Schedule stack deployment: Enabled"
-fi
 
 # Set AWS region
 export AWS_DEFAULT_REGION=$AWS_REGION
 
-# Determine which stacks to deploy
-STACKS_TO_DEPLOY=""
-if [ "$DEPLOY_AGENTX_STACK" = true ]; then
-  STACKS_TO_DEPLOY="$STACKS_TO_DEPLOY AgentXStack"
-fi
+# Build Lambda functions for Agent Schedule functionality
+echo "Building Lambda functions for Agent Schedule functionality..."
+(cd lib/lambda/agent-schedule-executor && npm install && npm run build)
 
-if [ "$DEPLOY_SCHEDULE_STACK" = true ]; then
-  STACKS_TO_DEPLOY="$STACKS_TO_DEPLOY AgentScheduleStack"
-fi
-
-# Deploy the stacks
-echo "Deploying stacks:$STACKS_TO_DEPLOY"
+# Deploy the stack using the combined CDK app
+echo "Deploying AgentX stack with combined functionality..."
 echo "CDK parameters: $CDK_PARAMS"
-cdk deploy --require-approval never $STACKS_TO_DEPLOY $CDK_PARAMS
+cdk --app "npx ts-node --prefer-ts-exts bin/cdk-combined.ts" deploy --require-approval never AgentXStack $CDK_PARAMS
 
 echo "Deployment complete!"
 echo "Check the AWS CloudFormation console for stack status and outputs."

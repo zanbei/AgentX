@@ -84,6 +84,12 @@ Model Context Protocol servers that extend agent capabilities:
 
 ## 📦 Deployment
 
+The deployment process consists of three main steps:
+
+1. **Create ECR repositories** for storing Docker images
+2. **Build and push Docker images** to ECR
+3. **Deploy the infrastructure** using AWS CDK
+
 For detailed deployment instructions, see [README-DEPLOYMENT.md](README-DEPLOYMENT.md).
 
 ## 📚 Documentation

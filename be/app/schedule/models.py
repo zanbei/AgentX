@@ -5,6 +5,7 @@ class ScheduleCreate(BaseModel):
     """Model for creating a new schedule."""
     agentId: str
     cronExpression: str
+    user_message: str
 
 class Schedule(BaseModel):
     """Model representing a schedule."""
@@ -15,3 +16,4 @@ class Schedule(BaseModel):
     status: str
     createdAt: str
     updatedAt: str
+    user_message: Optional[str] = None

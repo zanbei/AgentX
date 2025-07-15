@@ -125,6 +125,7 @@ export interface Schedule {
   status: string;
   createdAt: string;
   updatedAt: string;
+  user_message?: string;
 }
 
 // Mock data for schedules
@@ -420,7 +421,7 @@ export const scheduleAPI = {
   },
   
   // Create a new schedule
-  createSchedule: async (schedule: { agentId: string; cronExpression: string }): Promise<Schedule> => {
+  createSchedule: async (schedule: { agentId: string; cronExpression: string; user_message?: string }): Promise<Schedule> => {
     try {
       const response = await axios.post(SCHEDULE_API.create, schedule);
       return response.data;

@@ -13,6 +13,7 @@ const app = new cdk.App();
 const vpcId = app.node.tryGetContext('vpcId') || process.env.VPC_ID;
 const deployMysqlMcpServer = app.node.tryGetContext('deployMysqlMcpServer') !== 'false' && process.env.DEPLOY_MYSQL_MCP !== 'false';
 const deployRedshiftMcpServer = app.node.tryGetContext('deployRedshiftMcpServer') !== 'false' && process.env.DEPLOY_REDSHIFT_MCP !== 'false';
+const createDynamoDBTables = app.node.tryGetContext('createDynamoDBTables') !== 'false' && process.env.CREATE_DYNAMODB_TABLES !== 'false';
 const deployAgentXStack = app.node.tryGetContext('deployAgentXStack') !== 'false' && process.env.DEPLOY_AGENTX_STACK !== 'false';
 const deployScheduleStack = app.node.tryGetContext('deployScheduleStack') !== 'false' && process.env.DEPLOY_SCHEDULE_STACK !== 'false';
 
@@ -29,6 +30,7 @@ if (deployAgentXStack) {
     vpcId: vpcId,
     deployMysqlMcpServer: deployMysqlMcpServer,
     deployRedshiftMcpServer: deployRedshiftMcpServer,
+    createDynamoDBTables: createDynamoDBTables,
   });
 }
 
@@ -38,6 +40,7 @@ console.log(vpcId
   : 'No VPC ID provided. A new VPC will be created.');
 console.log(`MySQL MCP server deployment: ${deployMysqlMcpServer ? 'Enabled' : 'Disabled'}`);
 console.log(`Redshift MCP server deployment: ${deployRedshiftMcpServer ? 'Enabled' : 'Disabled'}`);
+console.log(`DynamoDB tables creation: ${createDynamoDBTables ? 'Enabled' : 'Disabled'}`);
 console.log(`AgentX stack deployment: ${deployAgentXStack ? 'Enabled' : 'Disabled'}`);
 console.log(`Agent Schedule stack deployment: ${deployScheduleStack ? 'Enabled' : 'Disabled'}`);
 

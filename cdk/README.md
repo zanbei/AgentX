@@ -7,11 +7,16 @@ This project contains AWS CDK code to deploy the AgentX application to AWS ECS.
 - AWS CLI installed and configured
 - Node.js 18.x or later
 - AWS CDK v2 installed (`npm install -g aws-cdk`)
+- Docker installed
+- AWS account with appropriate permissions
 
 ## Project Structure
 
-- `bin/cdk.ts` - Entry point for the CDK application
-- `lib/agentx-stack.ts` - Main stack definition with all AWS resources
+- `bin/cdk.ts` - Standard CDK entry point
+- `bin/cdk-combined.ts` - Combined CDK entry point with all stacks
+- `lib/agentx-stack-combined.ts` - Main stack definition with all AWS resources
+- `lib/agent-schedule-stack.ts` - Stack for agent scheduling functionality
+- `lib/lambda/` - Lambda function code
 
 ## Components
 
@@ -21,68 +26,109 @@ The deployment includes the following components:
 2. **Frontend (FE)** - React/TypeScript application
 3. **MCP MySQL** - MySQL MCP server
 4. **MCP Redshift** - Redshift MCP server
+5. **Agent Schedule** - Lambda function for executing scheduled agent tasks
 
-## Deployment Instructions
+## Deployment Process
 
-### 1. Build Docker Images
+### Step 1: Create ECR Repositories
 
-First, build and push Docker images for each component:
+Before building and pushing Docker images, create ECR repositories:
+
+```bash
+# Set your AWS region
+AWS_REGION=us-west-2
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Create ECR repositories
+aws ecr create-repository --repository-name agentx/be --region $AWS_REGION
+aws ecr create-repository --repository-name agentx/fe --region $AWS_REGION
+aws ecr create-repository --repository-name agentx/mcp-mysql --region $AWS_REGION
+aws ecr create-repository --repository-name agentx/mcp-redshift --region $AWS_REGION
+```
+
+### Step 2: Build and Push Docker Images
+
+Build and push Docker images for each component:
 
 ```bash
 # Login to ECR
-aws ecr get-login-password --region <your-region> | docker login --username AWS --password-stdin <your-account-id>.dkr.ecr.<your-region>.amazonaws.com
+aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
 # Build and push backend image
 cd ../be
-docker build -t agentx-be .
-docker tag agentx-be:latest <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/agentx-be:latest
-docker push <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/agentx-be:latest
+docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/be:latest .
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/be:latest
 
 # Build and push frontend image
 cd ../fe
-docker build -t agentx-fe .
-docker tag agentx-fe:latest <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/agentx-fe:latest
-docker push <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/agentx-fe:latest
+docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/fe:latest .
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/fe:latest
 
 # Build and push MCP MySQL image
 cd ../mcp/mysql
-docker build -t agentx-mcp-mysql .
-docker tag agentx-mcp-mysql:latest <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/agentx-mcp-mysql:latest
-docker push <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/agentx-mcp-mysql:latest
+docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/mcp-mysql:latest .
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/mcp-mysql:latest
 
 # Build and push MCP Redshift image
 cd ../mcp/redshift
-docker build -t agentx-mcp-redshift .
-docker tag agentx-mcp-redshift:latest <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/agentx-mcp-redshift:latest
-docker push <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/agentx-mcp-redshift:latest
+docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/mcp-redshift:latest .
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/mcp-redshift:latest
+cd ../..
 ```
 
-### 2. Deploy with CDK
+Alternatively, you can use the provided script:
+
+```bash
+# Make the script executable
+chmod +x ../build-and-push.sh
+
+# Run the script with your AWS region
+../build-and-push.sh us-west-2
+```
+
+### Step 3: Deploy with CDK
+
+After pushing the Docker images to ECR, deploy the infrastructure:
+
+#### Using the Automated Script (Recommended)
+
+```bash
+# Make the script executable
+chmod +x deploy.sh
+
+# Run the deployment script with options
+./deploy.sh --region us-west-2
+```
+
+Available options:
+- `--region REGION`: AWS region to deploy to
+- `--vpc-id VPC_ID`: Use existing VPC ID instead of creating a new one
+- `--no-mysql-mcp`: Disable MySQL MCP server deployment
+- `--no-redshift-mcp`: Disable Redshift MCP server deployment
+- `--no-dynamodb-tables`: Disable creation of DynamoDB tables
+
+#### Manual CDK Deployment
 
 ```bash
 # Install dependencies
 npm install
 
 # Bootstrap CDK (if not already done)
-cdk bootstrap
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+AWS_REGION=us-west-2
+cdk bootstrap aws://$AWS_ACCOUNT_ID/$AWS_REGION
 
-# Deploy the stack with default VPC (creates a new VPC)
-cdk deploy
-
-# OR deploy using an existing VPC (specify VPC ID)
-cdk deploy -c vpcId=vpc-12345678
-
-# OR deploy using an existing VPC via environment variable
-VPC_ID=vpc-12345678 cdk deploy
+# Deploy the stacks
+cdk --app "npx ts-node --prefer-ts-exts bin/cdk-combined.ts" deploy AgentXStack
 ```
 
-### 3. Configuration
+### Step 4: Configuration
 
 After deployment, you'll need to configure the following:
 
-1. **SSL Certificate**: For production, create and attach an SSL certificate to the HTTPS listener.
-2. **Environment Variables**: Update environment variables in the CDK stack for each service as needed.
-3. **Database Configuration**: Configure database connection strings for the services.
+1. **Environment Variables**: Update environment variables in the CDK stack for each service as needed.
+2. **Database Configuration**: Configure database connection strings for the MCP servers.
+3. **SSL Certificate**: For production, create and attach an SSL certificate to the HTTPS listener.
 
 ## Useful CDK Commands
 
@@ -91,18 +137,6 @@ After deployment, you'll need to configure the following:
 * `cdk deploy` - Deploy this stack to your default AWS account/region
 * `cdk diff` - Compare deployed stack with current state
 * `cdk synth` - Emit the synthesized CloudFormation template
-
-## Security Considerations
-
-- The CDK stack creates security groups that allow traffic between services.
-- For production, you should review and tighten security settings.
-- Consider using AWS Secrets Manager for sensitive environment variables.
-
-## Cost Optimization
-
-- The stack uses Fargate for simplicity, but you could use EC2 instances for cost savings.
-- Consider adjusting the desired count of services based on your traffic needs.
-- NAT Gateways incur costs; consider using VPC endpoints for AWS services.
 
 ## VPC Configuration
 
@@ -122,11 +156,11 @@ This is suitable for testing or when you need a dedicated VPC for the applicatio
 You can deploy the stack into an existing VPC by providing the VPC ID:
 
 ```bash
-# Using CDK context parameter
-cdk deploy -c vpcId=vpc-12345678
+# Using deploy.sh script
+./deploy.sh --region us-west-2 --vpc-id vpc-12345678
 
-# OR using environment variable
-VPC_ID=vpc-12345678 cdk deploy
+# OR using CDK context parameter
+cdk --app "npx ts-node --prefer-ts-exts bin/cdk-combined.ts" deploy AgentXStack -c vpcId=vpc-12345678
 ```
 
 Requirements for the existing VPC:
@@ -134,7 +168,25 @@ Requirements for the existing VPC:
 - Private subnets must have outbound internet connectivity (via NAT Gateway or similar)
 - Subnets must be properly tagged for ECS and ALB resource placement
 
-Using an existing VPC is recommended for:
-- Integration with existing resources
-- Cost optimization by sharing NAT Gateways
-- Compliance with organizational network policies
+## Security Considerations
+
+- The CDK stack creates security groups that allow traffic between services.
+- For production, you should review and tighten security settings.
+- Consider using AWS Secrets Manager for sensitive environment variables.
+
+## Cost Optimization
+
+- The stack uses Fargate for simplicity, but you could use EC2 instances for cost savings.
+- Consider adjusting the desired count of services based on your traffic needs.
+- NAT Gateways incur costs; consider using VPC endpoints for AWS services.
+
+## Troubleshooting
+
+If you encounter issues during deployment:
+
+1. Check that AWS credentials are correctly configured
+2. Verify that the CDK is bootstrapped in the target region
+3. Ensure all Docker images are built and pushed to ECR
+4. Check CloudFormation events for detailed error messages
+
+For more detailed deployment instructions, see the [main deployment guide](../README-DEPLOYMENT.md).

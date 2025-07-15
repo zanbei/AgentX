@@ -45,10 +45,37 @@ The project consists of the following deployable components:
 - Docker installed
 - Node.js 18.x or later
 - AWS CDK v2 installed (`npm install -g aws-cdk`)
+- AWS account with appropriate permissions
 
-### 2. Build and Push Docker Images
+### 2. Complete Deployment Process
 
-#### Using the Automated Script
+The deployment process consists of three main steps:
+
+1. **Create ECR repositories** for storing Docker images
+2. **Build and push Docker images** to ECR
+3. **Deploy the infrastructure** using AWS CDK
+
+#### Step 1: Create ECR Repositories
+
+Before building and pushing Docker images, you need to create ECR repositories:
+
+```bash
+# Set your AWS region
+AWS_REGION=us-west-2
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Create ECR repositories
+aws ecr create-repository --repository-name agentx/be --region $AWS_REGION
+aws ecr create-repository --repository-name agentx/fe --region $AWS_REGION
+aws ecr create-repository --repository-name agentx/mcp-mysql --region $AWS_REGION
+aws ecr create-repository --repository-name agentx/mcp-redshift --region $AWS_REGION
+```
+
+#### Step 2: Build and Push Docker Images
+
+After creating the repositories, build and push the Docker images:
+
+##### Option A: Using the Automated Script (Recommended)
 
 ```bash
 # Make the script executable
@@ -64,7 +91,7 @@ This script will:
 3. Build Docker images for all components
 4. Tag and push the images to ECR
 
-#### Manual Build and Push
+##### Option B: Manual Build and Push
 
 ```bash
 # Set your AWS account ID and region
@@ -96,14 +123,17 @@ docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/mcp-mys
 docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/mcp-mysql:latest
 
 # Build and push Redshift MCP server
-cd ../redshift
+cd ../mcp/redshift
 docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/mcp-redshift:latest .
 docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/agentx/mcp-redshift:latest
+cd ../..
 ```
 
-### 3. Deploy with CDK
+#### Step 3: Deploy with CDK
 
-#### Using the Automated Script
+After pushing the Docker images to ECR, deploy the infrastructure using AWS CDK:
+
+##### Option A: Using the Automated Script (Recommended)
 
 ```bash
 # Make the script executable
@@ -121,10 +151,9 @@ Available options:
 - `--vpc-id VPC_ID`: Use existing VPC ID instead of creating a new one
 - `--no-mysql-mcp`: Disable MySQL MCP server deployment
 - `--no-redshift-mcp`: Disable Redshift MCP server deployment
-- `--no-agentx-stack`: Disable AgentX stack deployment
-- `--only-schedule-stack`: Deploy only the Schedule stack
+- `--no-dynamodb-tables`: Disable creation of DynamoDB tables
 
-#### Manual CDK Deployment
+##### Option B: Manual CDK Deployment
 
 ```bash
 # Navigate to the CDK directory
@@ -134,17 +163,27 @@ cd cdk
 npm install
 
 # Bootstrap CDK (if not already done)
-cdk bootstrap aws://ACCOUNT-NUMBER/REGION
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+AWS_REGION=us-west-2
+cdk bootstrap aws://$AWS_ACCOUNT_ID/$AWS_REGION
 
 # Deploy the stacks
-cdk deploy --all
+cdk --app "npx ts-node --prefer-ts-exts bin/cdk-combined.ts" deploy AgentXStack
 ```
+
+### 3. Deployment Verification
+
+After deployment is complete, you can verify the deployment by:
+
+1. Checking the AWS CloudFormation console for stack status
+2. Accessing the application using the ALB DNS name provided in the CloudFormation outputs
+3. Monitoring the ECS services in the AWS ECS console
 
 ## ⚙️ Configuration
 
 ### Environment Variables
 
-Update the environment variables in the CDK stack (`cdk/lib/agentx-stack.ts`):
+Before deployment, you should update the environment variables in the CDK stack (`cdk/lib/agentx-stack-combined.ts`):
 
 #### Backend Environment Variables
 
@@ -166,7 +205,7 @@ const feContainer = feTaskDefinition.addContainer('FeContainer', {
   // ...
   environment: {
     NODE_ENV: 'production',
-    AWS_REGION: this.region,
+    API_BASE_URL: 'https://your-alb-dns-name/api',
     // Add other environment variables as needed
   },
 });

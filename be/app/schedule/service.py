@@ -1,5 +1,6 @@
 import uuid
 import json
+import os
 from datetime import datetime
 import boto3
 from typing import List, Dict, Any, Optional
@@ -16,10 +17,10 @@ dynamodb = boto3.resource('dynamodb', region_name=aws_region)
 # DynamoDB table name
 SCHEDULE_TABLE_NAME = "AgentScheduleTable"
 
-# Lambda function ARN that will be invoked by EventBridge
+# Lambda function ARN and role ARN from environment variables
 aws_region = get_aws_region()
-LAMBDA_FUNCTION_ARN = f"arn:aws:lambda:{aws_region}:719135481877:function:AgentScheduleStack-AgentScheduleExecutorFunction43-awm8gVnb50Ex"
-SCHEDULE_ROLE_ARN = "arn:aws:iam::719135481877:role/EventBridgeSchedulerExecutionRole"
+LAMBDA_FUNCTION_ARN = os.environ.get('LAMBDA_FUNCTION_ARN', f"arn:aws:lambda:{aws_region}:719135481877:function:AgentXStack-AgentScheduleExecutorFunction-XXXXXXXXXXXX")
+SCHEDULE_ROLE_ARN = os.environ.get('SCHEDULE_ROLE_ARN', "arn:aws:iam::719135481877:role/EventBridgeSchedulerExecutionRole")
 
 
 def list_schedules() -> List[Dict[str, Any]]:
@@ -71,11 +72,12 @@ def validate_cron_expression(cron_expression: str) -> str:
     return f"cron({cron_parts[0]} {cron_parts[1]} {cron_parts[2]} {cron_parts[3]} {cron_parts[4]} *)"
 
 
-def create_schedule(agent_id: str, cron_expression: str) -> Dict[str, Any]:
+def create_schedule(agent_id: str, cron_expression: str, user_message: str) -> Dict[str, Any]:
     """
     Create a new agent schedule.
     :param agent_id: The ID of the agent.
     :param cron_expression: The cron expression for the schedule.
+    :param user_message: The message to send to the agent when the schedule is triggered.
     :return: The created schedule.
     """
     try:
@@ -105,7 +107,8 @@ def create_schedule(agent_id: str, cron_expression: str) -> Dict[str, Any]:
                 "RoleArn": SCHEDULE_ROLE_ARN,
                 "Input": json.dumps({
                     "agent_id": agent_id,
-                    "schedule_id": schedule_id
+                    "schedule_id": schedule_id,
+                    "user_message": user_message
                 })
             },
             FlexibleTimeWindow={
@@ -122,7 +125,8 @@ def create_schedule(agent_id: str, cron_expression: str) -> Dict[str, Any]:
             "status": "ENABLED",
             "eventBridgeScheduleName": schedule_name,
             "createdAt": current_time,
-            "updatedAt": current_time
+            "updatedAt": current_time,
+            "user_message": user_message
         }
         
         table = dynamodb.Table(SCHEDULE_TABLE_NAME)
@@ -135,12 +139,13 @@ def create_schedule(agent_id: str, cron_expression: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to create schedule: {str(e)}")
 
 
-def update_schedule(schedule_id: str, agent_id: str, cron_expression: str) -> Dict[str, Any]:
+def update_schedule(schedule_id: str, agent_id: str, cron_expression: str, user_message: str) -> Dict[str, Any]:
     """
     Update a specific schedule by ID.
     :param schedule_id: The ID of the schedule to update.
     :param agent_id: The ID of the agent.
     :param cron_expression: The cron expression for the schedule.
+    :param user_message: The message to send to the agent when the schedule is triggered.
     :return: The updated schedule.
     """
     try:
@@ -172,7 +177,8 @@ def update_schedule(schedule_id: str, agent_id: str, cron_expression: str) -> Di
                 "RoleArn": SCHEDULE_ROLE_ARN,
                 "Input": json.dumps({
                     "agent_id": agent_id,
-                    "schedule_id": schedule_id
+                    "schedule_id": schedule_id,
+                    "user_message": user_message
                 })
             },
             FlexibleTimeWindow={
@@ -190,7 +196,8 @@ def update_schedule(schedule_id: str, agent_id: str, cron_expression: str) -> Di
             "status": schedule.get("status", "ENABLED"),
             "eventBridgeScheduleName": eventbridge_schedule_name,
             "createdAt": schedule.get("createdAt", current_time),
-            "updatedAt": current_time
+            "updatedAt": current_time,
+            "user_message": user_message
         }
         
         table.put_item(Item=updated_schedule)

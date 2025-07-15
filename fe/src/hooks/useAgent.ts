@@ -73,6 +73,49 @@ export const useAgent = () => {
       let accumulatedEvents: AgentEvent[] = [];
       const isStreamingEnabled = useChatStore.getState().streamingEnabled;
       
+      // Buffer to accumulate partial SSE messages
+      let buffer = '';
+      
+      const processSSEMessage = (data: string) => {
+        try {
+          const eventData = JSON.parse(data);
+          
+          if (getEventType(eventData) === "message") {
+            accumulatedEvents = [...accumulatedEvents, eventData];
+            setAgentEvents(accumulatedEvents);
+          }
+          
+          let formattedContent = '';
+          let htmlContent = '';
+          
+          // Format the events based on streaming mode
+          if (isStreamingEnabled) {
+            formattedContent = combineEvents(accumulatedEvents);
+            htmlContent = formatToHTML(formattedContent);
+          } else {
+            // Filter to only include message events
+            const currentMessageEvents = accumulatedEvents.filter(
+              event => getEventType(event) === 'message'
+            ) as MessageEvent[];
+            
+            if (currentMessageEvents.length > 0) {
+              for (const msgEvent of currentMessageEvents) {
+                const formatted = formatMessageEvent(msgEvent);
+                htmlContent += formatToHTML(formatted);
+              }
+            } else {
+              // If no message events yet, show a loading message
+              htmlContent = formatToHTML("Processing...");
+            }
+          }
+          
+          // Update the UI with the formatted HTML content
+          callbacks.onUpdate(htmlContent);
+        } catch (e) {
+          console.error('Error parsing SSE data:', data, e);
+        }
+      };
+      
       while (true) {
         const { done, value } = await reader.read();
         
@@ -80,52 +123,37 @@ export const useAgent = () => {
           break;
         }
         
-        // Decode the chunk
-        const chunk = decoder.decode(value);
+        // Decode the chunk and add it to our buffer
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
         
-        // Process the SSE data
-        const lines = chunk.split('\n\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const eventData = JSON.parse(line.substring(6));
-
-              if( getEventType(eventData) === "message" ) {
-                accumulatedEvents = [...accumulatedEvents, eventData];
-                setAgentEvents(accumulatedEvents);
-              }
-              
-              let formattedContent = '';
-              let htmlContent = '';
-              
-              // Format the events based on streaming mode
-              if (isStreamingEnabled) {
-                
-                formattedContent = combineEvents(accumulatedEvents);
-                htmlContent = formatToHTML(formattedContent);
-              } else {
-                
-                // Filter to only include message events
-                const currentMessageEvents = accumulatedEvents as MessageEvent[];
-                
-                if (currentMessageEvents.length > 0) {
-                  for (const msgEvent of currentMessageEvents) {
-                    const formatted = formatMessageEvent(msgEvent);
-                    htmlContent += formatToHTML(formatted);
-                  }
-                  
-                } else {
-                  // If no message events yet, show a loading message
-                  htmlContent = formatToHTML("Processing...");
-                }
-              }
-              
-              // Update the UI with the formatted HTML content
-              callbacks.onUpdate(htmlContent);
-            } catch (e) {
-              console.error('Error parsing SSE data:', e);
-            }
+        // Find complete SSE messages (data: ... followed by \n\n)
+        let dataStart = 0;
+        let dataEnd = 0;
+        
+        while ((dataStart = buffer.indexOf('data: ', dataEnd)) !== -1) {
+          dataEnd = buffer.indexOf('\n\n', dataStart);
+          
+          if (dataEnd === -1) {
+            // No complete message yet, wait for more data
+            break;
           }
+          
+          // Extract the data part (remove 'data: ' prefix)
+          const data = buffer.substring(dataStart + 6, dataEnd).trim();
+          
+          // Process the complete SSE message
+          processSSEMessage(data);
+          
+          // Move past this message
+          dataEnd += 2;
+        }
+        
+        // Keep any incomplete message in the buffer
+        if (dataStart !== -1 && dataEnd === -1) {
+          buffer = buffer.substring(dataStart);
+        } else if (dataEnd > 0) {
+          buffer = buffer.substring(dataEnd);
         }
       }
       

@@ -20,10 +20,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onCancel, loadin
     agents, 
     selectedAgent, 
     agentSelectionEnabled, 
-    streamingEnabled,
+    // streamingEnabled,
     setSelectedAgent, 
     setAgentSelectionEnabled,
-    setStreamingEnabled,
+    // setStreamingEnabled,
     fetchAgents 
   } = useChatStore();
   
@@ -131,14 +131,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onCancel, loadin
                           }}
                         />
                         <Divider type="vertical" />
-                        Streaming
+                        {/* Streaming
                         <Switch 
                           size="small" 
                           checked={streamingEnabled}
                           onChange={(checked) => {
                             setStreamingEnabled(checked);
                           }}
-                        />
+                        /> */}
                       </Space>
                     </Flex>
                     <Flex align="center">

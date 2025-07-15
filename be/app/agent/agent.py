@@ -314,6 +314,7 @@ class AgentPOService:
                         import os
                         os.environ[key] = value
 
+        print(agent)
         tools = []
         for t in agent.tools:
             if t.type == AgentToolType.strands:
@@ -370,7 +371,8 @@ class AgentPOService:
                              category=tool_json['category'],
                              desc=tool_json['desc'],
                              type=AgentToolType(tool_json['type']),
-                             mcp_server_url=tool_json.get('mcp_server_url', None))
+                             mcp_server_url=tool_json.get('mcp_server_url', None),
+                             agent_id= tool_json.get('agent_id', None))
     
         return AgentPO(
             id=item['id'],
@@ -392,7 +394,7 @@ def agent_as_tool(agent: AgentPO, **kwargs):
         return
 
     @tool(name=agent.name, description=agent.description)
-    def agent_tool(query: str):
+    def agent_tool(query: str) -> str:
         # Parse and set environment variables if they exist
         if agent.envs:
             for line in agent.envs.strip().split('\n'):
@@ -431,7 +433,8 @@ def agent_as_tool(agent: AgentPO, **kwargs):
             tools= tools
         )
 
-        agent_instance(query)
+        resp = agent_instance(query)
+        return str(resp)
 
     return agent_tool
 
@@ -577,42 +580,42 @@ class ChatRecordService:
 
 if __name__ == "__main__":
     # Example usage
-    agent = AgentPOBuilder() \
-        .set_id(uuid.uuid4().hex) \
-        .set_name("utility_agent") \
-        .set_display_name("测试Agent") \
-        .set_description("You are an agent that can get do all kinds of calculation and get current time") \
-        .set_agent_type(AgentType.plain) \
-        .set_model_provider(ModelProvider.bedrock) \
-        .set_model_id("us.anthropic.claude-3-7-sonnet-20250219-v1:0") \
-        .set_sys_prompt("You are a helpful assistant.") \
-        .set_tools([AgentTool(name="calculator", catagory="utilities", desc="Perform calculations and mathematical operations"),
-                    AgentTool(name="current_time", catagory="utilities", desc="Get the current time and date")]) \
-        .build()
+    # agent = AgentPOBuilder() \
+    #     .set_id(uuid.uuid4().hex) \
+    #     .set_name("utility_agent") \
+    #     .set_display_name("测试Agent") \
+    #     .set_description("You are an agent that can get do all kinds of calculation and get current time") \
+    #     .set_agent_type(AgentType.plain) \
+    #     .set_model_provider(ModelProvider.bedrock) \
+    #     .set_model_id("us.anthropic.claude-3-7-sonnet-20250219-v1:0") \
+    #     .set_sys_prompt("You are a helpful assistant.") \
+    #     .set_tools([AgentTool(name="calculator", catagory="utilities", desc="Perform calculations and mathematical operations"),
+    #                 AgentTool(name="current_time", catagory="utilities", desc="Get the current time and date")]) \
+    #     .build()
     
-    agent_with_mcp_tool = AgentPOBuilder() \
-        .set_id(uuid.uuid4().hex) \
-        .set_name("rds_agent") \
-        .set_display_name("AWs RDS Agent") \
-        .set_description("An Agent with RDS MySQL MCP Server") \
-        .set_agent_type(AgentType.plain) \
-        .set_model_provider(ModelProvider.bedrock) \
-        .set_model_id("us.anthropic.claude-3-7-sonnet-20250219-v1:0") \
-        .set_sys_prompt("You are an senior MySQL expert and are proficient at SQL and MySQL operation") \
-        .set_tools([AgentTool(name="", catagory="mysql", desc="MySQL MCP Server that can execute sql and get database and table statistics ", 
-                              type=AgentToolType.mcp, mcp_server_url="http://localhost:3000/mcp") ]) \
-        .build()
+    # agent_with_mcp_tool = AgentPOBuilder() \
+    #     .set_id(uuid.uuid4().hex) \
+    #     .set_name("rds_agent") \
+    #     .set_display_name("AWs RDS Agent") \
+    #     .set_description("An Agent with RDS MySQL MCP Server") \
+    #     .set_agent_type(AgentType.plain) \
+    #     .set_model_provider(ModelProvider.bedrock) \
+    #     .set_model_id("us.anthropic.claude-3-7-sonnet-20250219-v1:0") \
+    #     .set_sys_prompt("You are an senior MySQL expert and are proficient at SQL and MySQL operation") \
+    #     .set_tools([AgentTool(name="", catagory="mysql", desc="MySQL MCP Server that can execute sql and get database and table statistics ", 
+    #                           type=AgentToolType.mcp, mcp_server_url="http://localhost:3000/mcp") ]) \
+    #     .build()
     
-    orchestrator = AgentPOBuilder() \
-        .set_id(uuid.uuid4().hex) \
-        .set_name("orchestrator_agent") \
-        .set_display_name("Orchestrator Agent") \
-        .set_description("An orchestrator agent") \
-        .set_agent_type(AgentType.orchestrator) \
-        .set_model_id("us.anthropic.claude-3-7-sonnet-20250219-v1:0") \
-        .set_sys_prompt("You are an orchestrator agent, you can help me do many things.") \
-        .set_tools([AgentTool(name="utilities_tools", catagory="utilities", desc="General utility tools that can do all kinds of calculation and get current time", type= AgentToolType.agent,agent_id="9b33d98d425c44249db926ce5015b28d")]) \
-        .build()
+    # orchestrator = AgentPOBuilder() \
+    #     .set_id(uuid.uuid4().hex) \
+    #     .set_name("orchestrator_agent") \
+    #     .set_display_name("Orchestrator Agent") \
+    #     .set_description("An orchestrator agent") \
+    #     .set_agent_type(AgentType.orchestrator) \
+    #     .set_model_id("us.anthropic.claude-3-7-sonnet-20250219-v1:0") \
+    #     .set_sys_prompt("You are an orchestrator agent, you can help me do many things.") \
+    #     .set_tools([AgentTool(name="utilities_tools", catagory="utilities", desc="General utility tools that can do all kinds of calculation and get current time", type= AgentToolType.agent,agent_id="9b33d98d425c44249db926ce5015b28d")]) \
+    #     .build()
 
     # orchestrator = Agent(
     #     system_prompt="You are an orchestrator agent, you can help me do many things.",
@@ -637,5 +640,9 @@ if __name__ == "__main__":
     # strands_agent = agent_service.build_strands_agent(orchestrator)
     # strands_agent("100*300 等于多少")
 
-    strands_agent_with_mcp_tool = agent_service.build_strands_agent(agent_with_mcp_tool)
-    strands_agent_with_mcp_tool("mydata 数据库中一共有多少张表? 一共有多少行数据?")
+    # strands_agent_with_mcp_tool = agent_service.build_strands_agent(agent_with_mcp_tool)
+    # strands_agent_with_mcp_tool("mydata 数据库中一共有多少张表? 一共有多少行数据?")
+
+    agentPO = agent_service.get_agent(id= "0de59ed3181c417f9ede8472386bcd4a")
+    strands_agent = agent_service.build_strands_agent(agentPO)
+    strands_agent("Help me inspect the RDS cluster and all EC2 instances in us-west-2 region on 2025-07-13")

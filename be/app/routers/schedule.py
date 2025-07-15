@@ -29,11 +29,12 @@ async def create_schedule_endpoint(request: Request) -> Schedule:
         data = await request.json()
         agent_id = data.get("agentId")
         cron_expression = data.get("cronExpression")
+        user_message = data.get("user_message", f"[Scheduled Task] Execute scheduled task for agent {agent_id}")
         
         if not agent_id or not cron_expression:
             raise HTTPException(status_code=400, detail="Agent ID and cron expression are required")
         
-        schedule_item = create_schedule(agent_id, cron_expression)
+        schedule_item = create_schedule(agent_id, cron_expression, user_message)
         
         return Schedule(
             id=schedule_item["id"],
@@ -42,7 +43,8 @@ async def create_schedule_endpoint(request: Request) -> Schedule:
             cronExpression=schedule_item["cronExpression"],
             status=schedule_item["status"],
             createdAt=schedule_item["createdAt"],
-            updatedAt=schedule_item["updatedAt"]
+            updatedAt=schedule_item["updatedAt"],
+            user_message=schedule_item.get("user_message")
         )
     except HTTPException as e:
         raise e
@@ -61,11 +63,12 @@ async def update_schedule_endpoint(schedule_id: str, request: Request) -> Schedu
         data = await request.json()
         agent_id = data.get("agentId")
         cron_expression = data.get("cronExpression")
+        user_message = data.get("user_message", f"[Scheduled Task] Execute scheduled task for agent {agent_id}")
         
         if not agent_id or not cron_expression:
             raise HTTPException(status_code=400, detail="Agent ID and cron expression are required")
         
-        updated_schedule = update_schedule(schedule_id, agent_id, cron_expression)
+        updated_schedule = update_schedule(schedule_id, agent_id, cron_expression, user_message)
         
         return Schedule(
             id=updated_schedule["id"],
@@ -74,7 +77,8 @@ async def update_schedule_endpoint(schedule_id: str, request: Request) -> Schedu
             cronExpression=updated_schedule["cronExpression"],
             status=updated_schedule["status"],
             createdAt=updated_schedule["createdAt"],
-            updatedAt=updated_schedule["updatedAt"]
+            updatedAt=updated_schedule["updatedAt"],
+            user_message=updated_schedule.get("user_message")
         )
     except HTTPException as e:
         raise e
