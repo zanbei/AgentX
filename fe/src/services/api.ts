@@ -69,6 +69,7 @@ export const BEDROCK_MODELS = [
 // Interface for Tool
 export interface Tool {
   name: string;
+  display_name?: string; // Optional display name for better UI representation
   category: string;
   desc: string;
   type: number;
@@ -556,7 +557,7 @@ export const agentAPI = {
   },
   
   // Stream chat with an agent
-  streamChat: (agentId: string, userMessage: string): Promise<Response> => {
+  streamChat: (agentId: string, userMessage: string, chatRecordEnabled: boolean = true): Promise<Response> => {
     // Use fetch API to make a POST request with proper headers for SSE
     return fetch(AGENT_API.streamChat, {
       method: 'POST',
@@ -566,7 +567,8 @@ export const agentAPI = {
       },
       body: JSON.stringify({
         agent_id: agentId,
-        user_message: userMessage
+        user_message: userMessage,
+        chat_record_enabled: chatRecordEnabled
       })
     });
   }

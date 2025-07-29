@@ -44,6 +44,9 @@ export const useAgent = () => {
       console.log('Sending request with agent ID:', currentSelectedAgent.id);
       console.log('User message:', info.message);
       
+      // Get the chatRecordEnabled value from the store
+      const chatRecordEnabled = useChatStore.getState().chatRecordEnabled;
+      
       const response = await fetch('/api/agent/stream_chat', {
         method: 'POST',
         headers: {
@@ -52,7 +55,8 @@ export const useAgent = () => {
         },
         body: JSON.stringify({
           agent_id: currentSelectedAgent.id,
-          user_message: info.message.content
+          user_message: info.message.content,
+          chat_record_enabled: chatRecordEnabled
         })
       });
       
@@ -71,7 +75,6 @@ export const useAgent = () => {
       // Process the stream
       const decoder = new TextDecoder();
       let accumulatedEvents: AgentEvent[] = [];
-      const isStreamingEnabled = useChatStore.getState().streamingEnabled;
       
       // Buffer to accumulate partial SSE messages
       let buffer = '';
@@ -85,28 +88,21 @@ export const useAgent = () => {
             setAgentEvents(accumulatedEvents);
           }
           
-          let formattedContent = '';
           let htmlContent = '';
           
-          // Format the events based on streaming mode
-          if (isStreamingEnabled) {
-            formattedContent = combineEvents(accumulatedEvents);
-            htmlContent = formatToHTML(formattedContent);
-          } else {
-            // Filter to only include message events
-            const currentMessageEvents = accumulatedEvents.filter(
-              event => getEventType(event) === 'message'
-            ) as MessageEvent[];
-            
-            if (currentMessageEvents.length > 0) {
-              for (const msgEvent of currentMessageEvents) {
-                const formatted = formatMessageEvent(msgEvent);
-                htmlContent += formatToHTML(formatted);
-              }
-            } else {
-              // If no message events yet, show a loading message
-              htmlContent = formatToHTML("Processing...");
+          // Filter to only include message events
+          const currentMessageEvents = accumulatedEvents.filter(
+            event => getEventType(event) === 'message'
+          ) as MessageEvent[];
+          
+          if (currentMessageEvents.length > 0) {
+            for (const msgEvent of currentMessageEvents) {
+              const formatted = formatMessageEvent(msgEvent);
+              htmlContent += formatToHTML(formatted);
             }
+          } else {
+            // If no message events yet, show a loading message
+            htmlContent = formatToHTML("Processing...");
           }
           
           // Update the UI with the formatted HTML content
@@ -158,28 +154,19 @@ export const useAgent = () => {
       }
       
       // Complete the request
-      let finalContent = '';
       let htmlContent = '';
       
-      // Format the final content based on streaming mode
-      if (isStreamingEnabled) {
-        // In streaming mode, show all events
-        finalContent = combineEvents(accumulatedEvents);
-        htmlContent = formatToHTML(finalContent);
-      } else {
-        // In non-streaming mode, only show message events
-        const finalMessageEvents = accumulatedEvents.filter(event => getEventType(event) === 'message') as MessageEvent[];
-        if (finalMessageEvents.length > 0) {
-
-          for (const msgEvent of finalMessageEvents) {
-            const formatted = formatMessageEvent(msgEvent);
-            htmlContent += formatToHTML(formatted);
-          }
-        } else {
-          // If no message events, show all events as fallback
-          finalContent = combineEvents(accumulatedEvents);
-          htmlContent = formatToHTML(finalContent);
+      // Only show message events
+      const finalMessageEvents = accumulatedEvents.filter(event => getEventType(event) === 'message') as MessageEvent[];
+      if (finalMessageEvents.length > 0) {
+        for (const msgEvent of finalMessageEvents) {
+          const formatted = formatMessageEvent(msgEvent);
+          htmlContent += formatToHTML(formatted);
         }
+      } else {
+        // If no message events, show all events as fallback
+        const finalContent = combineEvents(accumulatedEvents);
+        htmlContent = formatToHTML(finalContent);
       }
       
       callbacks.onSuccess([htmlContent]);

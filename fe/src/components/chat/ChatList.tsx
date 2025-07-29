@@ -8,6 +8,7 @@ import {
   LikeOutlined,
   ReloadOutlined,
   ShareAltOutlined,
+  InfoCircleTwoTone
 } from '@ant-design/icons';
 import { useStyles } from '../../styles';
 import { useChatStore } from '../../store';
@@ -73,6 +74,25 @@ export const ChatList: React.FC<ChatListProps> = ({ onSubmit }) => {
               </Space>
             }
           />
+          <div className="system-update-notification">
+            <div className="system-update-icon-container">
+              <InfoCircleTwoTone />
+              {/* <img 
+                src="https://mdn.alipayobjects.com/huamei_iwk9zp/afts/img/A*NZuwQp_vcIkAAAAAAAAAAAAADgCCAQ/fmt.webp" 
+                alt="System Update" 
+                className="system-update-icon"
+              /> */}
+            </div>
+            <div className="system-update-content">
+              <div className="system-update-title">
+                System Updates
+              </div>
+              <div className="system-update-description">
+                 1. AgentCore Browser Use and Code Interpreter tools are now available! 🎉🎉🎉 <br/>
+                 2. OpenSearch MCP Server is now available! 🎉🎉🎉
+              </div>
+            </div>
+          </div>
           <div className="agentx-welcome-container">
             <div className="agentx-welcome-overlay-radial" />
             <div className="agentx-welcome-overlay-linear" />

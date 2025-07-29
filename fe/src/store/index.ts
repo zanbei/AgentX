@@ -18,8 +18,7 @@ interface ChatState {
   inputValue: string;
   agents: Agent[];
   selectedAgent: Agent | null;
-  agentSelectionEnabled: boolean;
-  streamingEnabled: boolean;
+  chatRecordEnabled: boolean;
   
   // Agent State
   agentEvents: AgentEvent[];
@@ -43,8 +42,7 @@ interface ChatState {
   setInputValue: (value: string) => void;
   setAgents: (agents: Agent[]) => void;
   setSelectedAgent: (agent: Agent | null) => void;
-  setAgentSelectionEnabled: (enabled: boolean) => void;
-  setStreamingEnabled: (enabled: boolean) => void;
+  setChatRecordEnabled: (enabled: boolean) => void;
   setAgentEvents: (events: AgentEvent[]) => void;
   setIsProcessing: (isProcessing: boolean) => void;
   fetchAgents: () => Promise<void>;
@@ -64,8 +62,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   agents: [],
   selectedAgent: null,
-  agentSelectionEnabled: true,
-  streamingEnabled: false,
+  chatRecordEnabled: true,
   agentEvents: [],
   isProcessing: false,
   
@@ -78,8 +75,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setInputValue: (value) => set({ inputValue: value }),
   setAgents: (agents) => set({ agents }),
   setSelectedAgent: (agent) => set({ selectedAgent: agent }),
-  setAgentSelectionEnabled: (enabled) => set({ agentSelectionEnabled: enabled }),
-  setStreamingEnabled: (enabled) => set({ streamingEnabled: enabled }),
+  setChatRecordEnabled: (enabled) => set({ chatRecordEnabled: enabled }),
   setAgentEvents: (events) => set({ agentEvents: events }),
   setIsProcessing: (isProcessing) => {
     set({ isProcessing });

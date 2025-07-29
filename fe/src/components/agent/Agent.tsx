@@ -232,7 +232,7 @@ export const AgentManager: React.FC = () => {
         <Space direction="vertical">
           {tools.map((tool, index) => (
             <a key={index} onClick={() => handleToolClick(tool)}>
-              {tool.name}
+              {tool.display_name? tool.display_name: tool.name}
             </a>
           ))}
           <span style={{ color: '#999' }}>{tools.length} 个工具</span>
@@ -400,7 +400,7 @@ export const AgentManager: React.FC = () => {
           {availableTools.map((tool, index) => (
             <Option key={index} value={tool.name} label={tool.name}>
               <div>
-                <div>{tool.name}</div>
+                <div>{tool.display_name? tool.display_name: tool.name}</div>
                 <div style={{ fontSize: '12px', color: '#999' }}>{tool.desc}</div>
               </div>
             </Option>

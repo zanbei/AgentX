@@ -22,32 +22,36 @@ AgentToolType = Enum("AgentToolType", ("strands", "mcp", "agent", "python"))
 
 class Tools(Enum):
 
-    retrieve = "RAG & Memory", "Retrive data from Amazon Bedrock Knowledge Base for RAG, memory, and other purpose"
-    memory = "RAG & Memory", "Agent memory persistence in Amazon Bedrock Knowledge Bases"
-    mem0_memory = "RAG & Memory", "Agent memory and personalization built on top of Mem0"
+    retrieve = "RAG & Memory","retrieve", "Retrive data from Amazon Bedrock Knowledge Base for RAG, memory, and other purpose"
+    memory = "RAG & Memory", "memory", "Agent memory persistence in Amazon Bedrock Knowledge Bases"
+    mem0_memory = "RAG & Memory", "mem0_memory", "Agent memory and personalization built on top of Mem0"
 
-    editor = "FileOps", "File editing operations like line edits, search, and undo"
-    file_read = "FileOps", "Read and parse files"
-    file_write = "FileOps", "Create and modify files"
+    editor = "FileOps", "editor", "File editing operations like line edits, search, and undo"
+    file_read = "FileOps", "file_read", "Read and parse files"
+    file_write = "FileOps", "file_write", "Create and modify files"
 
-    http_request = "Web & Network", "Make API calls, fetch web data, and call local HTTP servers"
-    slack = "Web & Network", "Slack integration with real-time events, API access, and message sending"
+    http_request = "Web & Network", "http_request", "Make API calls, fetch web data, and call local HTTP servers"
+    slack = "Web & Network", "slack", "Slack integration with real-time events, API access, and message sending"
 
-    image_reader = "Multi-modal", "Process and analyze images"
-    generate_image = "Multi-modal", "Create AI generated images with Amazon Bedrock"
-    nova_reels = "nova_reels", "Create AI generated videos with Nova Reels on Amazon Bedrock"
-    speak = "nova_reels", "Generate speech from text using macOS say command or Amazon Polly"
+    image_reader = "Multi-modal", "image_reader", "Process and analyze images"
+    generate_image = "Multi-modal", "generate_image", "Create AI generated images with Amazon Bedrock"
+    nova_reels = "nova_reels", "nova_reels", "Create AI generated videos with Nova Reels on Amazon Bedrock"
+    speak = "nova_reels", "speak", "Generate speech from text using macOS say command or Amazon Polly"
 
-    use_aws = "AWS Services", "Interact with AWS services"
+    use_aws = "AWS Services", "use_aws","Interact with AWS services"
 
-    calculator = "Utilities", "Perform calculations and mathematical operations"
-    current_time = "Utilities", "Get the current time and date"
+    calculator = "Utilities", "calculator","Perform calculations and mathematical operations"
+    current_time = "Utilities", "current_time", "Get the current time and date"
+    
+    agentCoreBrowser = "Browser", "browser.AgentCoreBrowser.browser","Interact with web browsers, take screenshots, and perform web automation"
+    agentCodeInterpreter = "Code", "code_interpreter.AgentCoreCodeInterpreter.code_interpreter","Perform code execution, data analysis, and file operations using the Code Interpreter tool"
 
 
-    def __init__(self, category: str, desc: str):
+    def __init__(self, category: str, identify:str, desc: str):
         super().__init__()
         self._category = category
         self._desc = desc
+        self._identify = identify
 
     @property
     def desc(self):
@@ -56,6 +60,10 @@ class Tools(Enum):
     @property
     def category(self):
         return self._category
+    
+    @property
+    def identify(self):
+        return self._identify
 
     @classmethod
     def getToolByName(cls, name: str) -> Optional:
@@ -65,7 +73,7 @@ class Tools(Enum):
         return None
 
     def __repr__(self):
-        return f"Tools(name={self.name}, category={self.category}, desc={self.desc})"
+        return f"Tools(name={self.name}, category={self.category}, identify = {self.identify}, desc={self.desc})"
 
 
 class HttpMCPSerer(object):
@@ -79,15 +87,18 @@ class HttpMCPSerer(object):
 
 class AgentTool(BaseModel):
     name: str
+    display_name: Optional[str] = None
     category: str
     desc:str
     type: AgentToolType = AgentToolType.strands
     mcp_server_url: Optional[str] = None
     agent_id: Optional[str] = None
+    extra: Optional[dict] = None
 
     def __repr__(self):
-        return f"AgentTool(name={self.name}, category={self.category}, desc={self.desc}, type={self.type}, " \
-               f"mcp_server_url={self.mcp_server_url}), agent_id={self.agent_id})"
+        return f"AgentTool(name={self.name}, display_name={self.display_name} ,category={self.category},  " \
+               f"desc={self.desc}, type={self.type}, mcp_server_url={self.mcp_server_url}, "\
+               f"agent_id={self.agent_id}, extra={self.extra})"
     
 class AgentPO(BaseModel):
     id: str
@@ -281,17 +292,17 @@ class AgentPOService:
         """
         tools = []
         for tool in Tools:
-            tools.append(AgentTool(name=tool.name, category=tool.category, desc=tool.desc))
+            tools.append(AgentTool(name=tool.identify, display_name=tool.name, category=tool.category, desc=tool.desc))
         
         # Add Agent tools(Only plain agents)
         for agent in self.list_agents():
             if agent.agent_type == AgentType.plain:
-                tools.append(AgentTool(name=agent.name, category="Agent", desc=agent.description, type=AgentToolType.agent, agent_id=agent.id))
+                tools.append(AgentTool(name=agent.name, display_name=agent.name, category="Agent", desc=agent.description, type=AgentToolType.agent, agent_id=agent.id))
 
         # Add MCP tools
         mcpService = MCPService()
         for mcp in mcpService.list_mcp_servers():
-            tools.append(AgentTool(name=mcp.name, category="Mcp", desc=mcp.desc, type=AgentToolType.mcp, mcp_server_url=mcp.host))
+            tools.append(AgentTool(name=mcp.name, display_name=mcp.name, category="Mcp", desc=mcp.desc, type=AgentToolType.mcp, mcp_server_url=mcp.host))
         
         return tools
 
@@ -313,17 +324,29 @@ class AgentPOService:
                         print(f"Setting environment variable: {key}")
                         import os
                         os.environ[key] = value
-
-        print(agent)
+        # Load tools based on their type
         tools = []
         for t in agent.tools:
             if t.type == AgentToolType.strands:
                 try:
                     print(f"tool.name: {t.name}")
-                    module = importlib.import_module(f"strands_tools.{t.name}")
-                    # func = getattr(module, t.name)
-                    # tools.append(func)
-                    tools.append(module)
+                    name_segs = t.name.split(".")
+                    if len(name_segs) ==1:
+                        # If the tool name is just a single name, it is a module in strands_tools
+                        module = importlib.import_module(f"strands_tools.{t.name}")
+                        tools.append(module)
+                    elif len(name_segs) >= 3:
+                        # module.class.method pattern
+                        module_name = f"strands_tools.{'.'.join(name_segs[:-2])}"
+                        class_name = name_segs[-2]
+                        method_name = name_segs[-1]
+                        module = importlib.import_module(module_name)
+                        cls = getattr(module, class_name)
+                        obj = cls()
+                        method = getattr(obj, method_name)
+                        tools.append(method)
+                    else:
+                        raise AttributeError(f"Invalid tool name format: {t.name}. Expected format: module.class.method or module.")
                 except (ImportError, AttributeError) as e:
                     print(f"Error loading tool {t.name}: {e}")
             elif t.type == AgentToolType.agent and t.agent_id:
@@ -367,7 +390,9 @@ class AgentPOService:
             """
             Convert a JSON string to an AgentTool object.
             """
-            return AgentTool(name=tool_json['name'],
+            return AgentTool(
+                             name=tool_json['name'],
+                             display_name= tool_json.get('display_name', tool_json['name']),
                              category=tool_json['category'],
                              desc=tool_json['desc'],
                              type=AgentToolType(tool_json['type']),
@@ -541,7 +566,7 @@ class ChatRecordService:
         :return: A list of ChatResponse objects.
         """
         table = self.dynamodb.Table(self.chat_response_table_name)
-        response = table.scan(FilterExpression=Attr('id').eq(chat_id))
+        response = table.query(KeyConditionExpression=boto3.dynamodb.conditions.Key('id').eq(chat_id))
         items = response.get('Items', [])
         if items:
             return [ChatResponse(chat_id=item['id'], resp_no=item['resp_no'], content=item['content'], create_time=item['create_time']) for item in items]

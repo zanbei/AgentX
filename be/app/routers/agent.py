@@ -76,37 +76,40 @@ async def create_agent(request: Request) -> AgentPO:
     agent_service.add_agent(agent_po)
     return agent_po
 
-async def parse_chat_request_and_add_record(request: Request) -> Tuple[Optional[str], Optional[str], str]:
+async def parse_chat_request_and_add_record(request: Request) -> Tuple[Optional[str], Optional[str], str, bool]:
     """
     Parse a chat request to extract agent_id, user_message, and create a chat record.
     
     :param request: The request containing the chat parameters.
-    :return: A tuple of (agent_id, user_message, chat_id).
+    :return: A tuple of (agent_id, user_message, chat_id, chat_record_enabled).
     """
     data = await request.json()
     agent_id = data.get("agent_id")
     user_message = data.get("user_message")
+    chat_record_enabled = data.get("chat_record_enabled", True)  # Default to True if not provided
     
-    # Create a chat record
+    # Create a chat record if chat_record_enabled is True
     chat_id = uuid.uuid4().hex
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    chat_record = ChatRecord(id=chat_id, agent_id=agent_id, user_message=user_message, create_time=current_time)
-    chat_reccord_service.add_chat_record(chat_record)
+    if chat_record_enabled:
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        chat_record = ChatRecord(id=chat_id, agent_id=agent_id, user_message=user_message, create_time=current_time)
+        chat_reccord_service.add_chat_record(chat_record)
     
-    return agent_id, user_message, chat_id
+    return agent_id, user_message, chat_id, chat_record_enabled
 
-async def process_chat_events(agent_id: str, user_message: str, chat_id: str) -> AsyncGenerator[Dict, None]:
+async def process_chat_events(agent_id: str, user_message: str, chat_id: str, chat_record_enabled: bool = True) -> AsyncGenerator[Dict, None]:
     """
-    Process chat events and save responses to the database.
+    Process chat events and save responses to the database if chat_record_enabled is True.
     
     :param agent_id: The ID of the agent to chat with.
     :param user_message: The user's message to process.
     :param chat_id: The ID of the chat record.
+    :param chat_record_enabled: Whether to save chat responses to the database.
     :yield: Chat events.
     """
     resp_no = 0
     async for event in agent_service.stream_chat(agent_id, user_message):
-        if ("message" in event and "role" in event["message"]):
+        if chat_record_enabled and ("message" in event and "role" in event["message"]):
             chat_resp = ChatResponse(
                 chat_id=chat_id, 
                 resp_no=resp_no, 
@@ -124,7 +127,7 @@ async def stream_chat(request: Request) -> StreamingResponse:
     :param request: The request containing the chat parameters.
     :return: A stream of chat messages.
     """
-    agent_id, user_message, chat_id = await parse_chat_request_and_add_record(request)
+    agent_id, user_message, chat_id, chat_record_enabled = await parse_chat_request_and_add_record(request)
     
     if not agent_id or not user_message:
         return "Agent ID and user message are required."
@@ -133,7 +136,7 @@ async def stream_chat(request: Request) -> StreamingResponse:
         """
         Generator function to yield SSE formatted events.
         """
-        async for event in process_chat_events(agent_id, user_message, chat_id):
+        async for event in process_chat_events(agent_id, user_message, chat_id, chat_record_enabled):
             # Format the event as an SSE
             yield EventSerializer.format_as_sse(event)
     
@@ -152,7 +155,7 @@ async def async_chat(request: Request, background_tasks: BackgroundTasks) -> JSO
     :param background_tasks: FastAPI's BackgroundTasks for background processing.
     :return: A JSON response with the chat ID.
     """
-    agent_id, user_message, chat_id = await parse_chat_request_and_add_record(request)
+    agent_id, user_message, chat_id, chat_record_enabled = await parse_chat_request_and_add_record(request)
     
     if not agent_id or not user_message:
         return JSONResponse(
@@ -165,7 +168,8 @@ async def async_chat(request: Request, background_tasks: BackgroundTasks) -> JSO
         process_chat_in_background,
         agent_id=agent_id,
         user_message=user_message,
-        chat_id=chat_id
+        chat_id=chat_id,
+        chat_record_enabled=chat_record_enabled
     )
     
     # Return immediately with the chat ID
@@ -177,16 +181,17 @@ async def async_chat(request: Request, background_tasks: BackgroundTasks) -> JSO
         }
     )
 
-async def process_chat_in_background(agent_id: str, user_message: str, chat_id: str):
+async def process_chat_in_background(agent_id: str, user_message: str, chat_id: str, chat_record_enabled: bool = True):
     """
     Process a chat message in the background.
     
     :param agent_id: The ID of the agent to chat with.
     :param user_message: The user's message to process.
     :param chat_id: The ID of the chat record.
+    :param chat_record_enabled: Whether to save chat responses to the database.
     """
     try:
-        async for _ in process_chat_events(agent_id, user_message, chat_id):
+        async for _ in process_chat_events(agent_id, user_message, chat_id, chat_record_enabled):
             pass  # We just need to consume the generator
         print(f"Background processing completed for chat {chat_id}")
     except Exception as e:

@@ -19,11 +19,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onCancel, loadin
     setInputValue, 
     agents, 
     selectedAgent, 
-    agentSelectionEnabled, 
-    // streamingEnabled,
+    chatRecordEnabled,
     setSelectedAgent, 
-    setAgentSelectionEnabled,
-    // setStreamingEnabled,
+    setChatRecordEnabled,
     fetchAgents 
   } = useChatStore();
   
@@ -35,8 +33,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onCancel, loadin
   const handleSubmit = () => {
     if (!inputValue) return;
     
-    // Check if agent is selected when agent selection is enabled
-    if (agentSelectionEnabled && !selectedAgent) {
+    // Check if agent is selected
+    if (!selectedAgent) {
       // message.warning('Please select an agent first');
       return;
     }
@@ -99,7 +97,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onCancel, loadin
               }
               onSubmit={handleSubmit}
               onChange={(value) => {
-                if (value === '/' && agentSelectionEnabled) {
+                if (value === '/') {
                   console.log(`sender onChange: value: ${value}`);
                   onTrigger();
                 } else if (!value) {
@@ -119,26 +117,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onCancel, loadin
                     <Flex gap="small" align="center">
                       <Space>
                         <UserOutlined />
-                        Agent
+                        Chat History
                         <Switch 
                           size="small" 
-                          checked={agentSelectionEnabled}
+                          checked={chatRecordEnabled}
                           onChange={(checked) => {
-                            setAgentSelectionEnabled(checked);
-                            if (!checked && selectedAgent) {
-                              setSelectedAgent(null);
-                            }
+                            setChatRecordEnabled(checked);
                           }}
                         />
-                        <Divider type="vertical" />
-                        {/* Streaming
-                        <Switch 
-                          size="small" 
-                          checked={streamingEnabled}
-                          onChange={(checked) => {
-                            setStreamingEnabled(checked);
-                          }}
-                        /> */}
                       </Space>
                     </Flex>
                     <Flex align="center">
@@ -150,7 +136,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onCancel, loadin
                 );
               }}
               actions={false}
-              placeholder={agentSelectionEnabled ? "Ask or input / to select an agent" : "Ask a question"}
+              placeholder="Ask or input / to select an agent"
             />
           )}
         </Suggestion>

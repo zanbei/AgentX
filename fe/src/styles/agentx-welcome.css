@@ -123,3 +123,43 @@
     transform: scale(1.1);
   }
 }
+
+/* System Update Notification */
+.system-update-notification {
+  padding: 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  background-color: #fafafa;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.system-update-icon-container {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e6f7ff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.system-update-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.system-update-content {
+  flex: 1;
+}
+
+.system-update-title {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.system-update-description {
+  color: #666;
+}
