@@ -1,0 +1,16 @@
+{
+  "name": "agent-schedule-executor",
+  "version": "1.0.0",
+  "description": "Lambda function to execute scheduled agent tasks",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^18.19.118",
+    "typescript": "^5.0.0"
+  }
+}
