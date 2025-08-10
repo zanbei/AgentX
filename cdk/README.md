@@ -26,7 +26,9 @@ The deployment includes the following components:
 2. **Frontend (FE)** - React/TypeScript application
 3. **MCP MySQL** - MySQL MCP server
 4. **MCP Redshift** - Redshift MCP server
-5. **Agent Schedule** - Lambda function for executing scheduled agent tasks
+5. **MCP DuckDB** - DuckDB MCP server
+6. **MCP OpenSearch** - OpenSearch MCP server
+7. **Agent Schedule** - Lambda function for executing scheduled agent tasks
 
 ## Deployment Process
 
@@ -44,6 +46,8 @@ aws ecr create-repository --repository-name agentx/be --region $AWS_REGION
 aws ecr create-repository --repository-name agentx/fe --region $AWS_REGION
 aws ecr create-repository --repository-name agentx/mcp-mysql --region $AWS_REGION
 aws ecr create-repository --repository-name agentx/mcp-redshift --region $AWS_REGION
+aws ecr create-repository --repository-name agentx/mcp-duckdb --region $AWS_REGION
+aws ecr create-repository --repository-name agentx/mcp-opensearch --region $AWS_REGION
 ```
 
 ### Step 2: Build and Push Docker Images
@@ -105,6 +109,8 @@ Available options:
 - `--vpc-id VPC_ID`: Use existing VPC ID instead of creating a new one
 - `--no-mysql-mcp`: Disable MySQL MCP server deployment
 - `--no-redshift-mcp`: Disable Redshift MCP server deployment
+- `--no-duckdb-mcp`: Disable DuckDB MCP server deployment
+- `--no-opensearch-mcp`: Disable OpenSearch MCP server deployment
 - `--no-dynamodb-tables`: Disable creation of DynamoDB tables
 
 #### Manual CDK Deployment

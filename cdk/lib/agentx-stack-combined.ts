@@ -30,6 +30,18 @@ export interface AgentXStackProps extends cdk.StackProps {
   deployRedshiftMcpServer?: boolean;
 
   /**
+   * Whether to deploy the DuckDB MCP server.
+   * If not provided, defaults to true.
+   */
+  deployDuckDbMcpServer?: boolean;
+
+  /**
+   * Whether to deploy the OpenSearch MCP server.
+   * If not provided, defaults to true.
+   */
+  deployOpenSearchMcpServer?: boolean;
+
+  /**
    * Whether to create DynamoDB tables used by agent and MCP services.
    * If not provided, defaults to true.
    */
@@ -72,6 +84,8 @@ export class AgentXStack extends cdk.Stack {
     const feRepository = ecr.Repository.fromRepositoryName(this, 'FeRepository', 'agentx/fe');
     const mcpMysqlRepository = ecr.Repository.fromRepositoryName(this, 'McpMysqlRepository', 'agentx/mcp-mysql');
     const mcpRedshiftRepository = ecr.Repository.fromRepositoryName(this, 'McpRedshiftRepository', 'agentx/mcp-redshift');
+    const mcpDuckDbRepository = ecr.Repository.fromRepositoryName(this, 'McpDuckDbRepository', 'agentx/mcp-duckdb');
+    const mcpOpenSearchRepository = ecr.Repository.fromRepositoryName(this, 'McpOpenSearchRepository', 'agentx/mcp-opensearch');
 
     // Create a security group for the load balancer
     const lbSecurityGroup = new ec2.SecurityGroup(this, 'LbSecurityGroup', {
@@ -134,6 +148,16 @@ export class AgentXStack extends cdk.Stack {
     });
     mcpRedshiftTaskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'));
 
+    const mcpDuckDbTaskRole = new iam.Role(this, 'McpDuckDbTaskRole', {
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    });
+    mcpDuckDbTaskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'));
+
+    const mcpOpenSearchTaskRole = new iam.Role(this, 'McpOpenSearchTaskRole', {
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    });
+    mcpOpenSearchTaskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'));
+
     // Create log groups for each service
     const beLogGroup = new logs.LogGroup(this, 'BeLogGroup', {
       logGroupName: '/ecs/agentx-be',
@@ -155,6 +179,18 @@ export class AgentXStack extends cdk.Stack {
 
     const mcpRedshiftLogGroup = new logs.LogGroup(this, 'McpRedshiftLogGroup', {
       logGroupName: '/ecs/agentx-mcp-redshift',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      retention: logs.RetentionDays.ONE_WEEK,
+    });
+
+    const mcpDuckDbLogGroup = new logs.LogGroup(this, 'McpDuckDbLogGroup', {
+      logGroupName: '/ecs/agentx-mcp-duckdb',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      retention: logs.RetentionDays.ONE_WEEK,
+    });
+
+    const mcpOpenSearchLogGroup = new logs.LogGroup(this, 'McpOpenSearchLogGroup', {
+      logGroupName: '/ecs/agentx-mcp-opensearch',
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       retention: logs.RetentionDays.ONE_WEEK,
     });
@@ -186,6 +222,20 @@ export class AgentXStack extends cdk.Stack {
       cpu: 256,
       executionRole,
       taskRole: mcpRedshiftTaskRole,
+    });
+
+    const mcpDuckDbTaskDefinition = new ecs.FargateTaskDefinition(this, 'McpDuckDbTaskDefinition', {
+      memoryLimitMiB: 512,
+      cpu: 256,
+      executionRole,
+      taskRole: mcpDuckDbTaskRole,
+    });
+
+    const mcpOpenSearchTaskDefinition = new ecs.FargateTaskDefinition(this, 'McpOpenSearchTaskDefinition', {
+      memoryLimitMiB: 512,
+      cpu: 256,
+      executionRole,
+      taskRole: mcpOpenSearchTaskRole,
     });
 
     // Add container definitions for each service
@@ -273,9 +323,54 @@ export class AgentXStack extends cdk.Stack {
       ],
     });
 
+    const mcpDuckDbContainer = mcpDuckDbTaskDefinition.addContainer('McpDuckDbContainer', {
+      image: ecs.ContainerImage.fromEcrRepository(mcpDuckDbRepository),
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'mcp-duckdb',
+        logGroup: mcpDuckDbLogGroup,
+      }),
+      environment: {
+        // Add environment variables as needed
+        PYTHON_ENV: 'production',
+        AWS_REGION: this.region,
+        PORT: '8000',
+      },
+      portMappings: [
+        {
+          name: 'mcp-duckdb-svr',
+          containerPort: 8000,
+          hostPort: 8000,
+          protocol: ecs.Protocol.TCP,
+        },
+      ],
+    });
+
+    const mcpOpenSearchContainer = mcpOpenSearchTaskDefinition.addContainer('McpOpenSearchContainer', {
+      image: ecs.ContainerImage.fromEcrRepository(mcpOpenSearchRepository),
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'mcp-opensearch',
+        logGroup: mcpOpenSearchLogGroup,
+      }),
+      environment: {
+        // Add environment variables as needed
+        NODE_ENV: 'production',
+        AWS_REGION: this.region,
+      },
+      portMappings: [
+        {
+          name: 'mcp-opensearch-svr',
+          containerPort: 3000,
+          hostPort: 3000,
+          protocol: ecs.Protocol.TCP,
+        },
+      ],
+    });
+
     // Determine whether to deploy MCP servers and create DynamoDB tables based on props
     const deployMysqlMcpServer = props?.deployMysqlMcpServer !== false; // Default to true if not specified
     const deployRedshiftMcpServer = props?.deployRedshiftMcpServer !== false; // Default to true if not specified
+    const deployDuckDbMcpServer = props?.deployDuckDbMcpServer !== false; // Default to true if not specified
+    const deployOpenSearchMcpServer = props?.deployOpenSearchMcpServer !== false; // Default to true if not specified
     const createDynamoDBTables = props?.createDynamoDBTables !== false; // Default to true if not specified
     
     // Conditionally create DynamoDB tables for agent and MCP services
@@ -384,6 +479,38 @@ export class AgentXStack extends cdk.Stack {
       });
     }
 
+    let mcpDuckDbTargetGroup: elbv2.ApplicationTargetGroup | undefined;
+    if (deployDuckDbMcpServer) {
+      mcpDuckDbTargetGroup = new elbv2.ApplicationTargetGroup(this, 'McpDuckDbTargetGroup', {
+        vpc,
+        port: 8000,
+        protocol: elbv2.ApplicationProtocol.HTTP,
+        targetType: elbv2.TargetType.IP,
+        healthCheck: {
+          path: '/mcp',
+          interval: cdk.Duration.seconds(60),
+          timeout: cdk.Duration.seconds(5),
+          healthyHttpCodes: '307',
+        },
+      });
+    }
+
+    let mcpOpenSearchTargetGroup: elbv2.ApplicationTargetGroup | undefined;
+    if (deployOpenSearchMcpServer) {
+      mcpOpenSearchTargetGroup = new elbv2.ApplicationTargetGroup(this, 'McpOpenSearchTargetGroup', {
+        vpc,
+        port: 3000,
+        protocol: elbv2.ApplicationProtocol.HTTP,
+        targetType: elbv2.TargetType.IP,
+        healthCheck: {
+          path: '/health',
+          interval: cdk.Duration.seconds(60),
+          timeout: cdk.Duration.seconds(5),
+          healthyHttpCodes: '200',
+        },
+      });
+    }
+
     // Create a listener for HTTP with default action to forward to frontend
     const httpListener = lb.addListener('HttpListener', {
       port: 80,
@@ -420,6 +547,26 @@ export class AgentXStack extends cdk.Stack {
         ],
         priority: 30,
         action: elbv2.ListenerAction.forward([mcpRedshiftTargetGroup]),
+      });
+    }
+
+    if (deployDuckDbMcpServer && mcpDuckDbTargetGroup) {
+      httpListener.addAction('McpDuckDbAction', {
+        conditions: [
+          elbv2.ListenerCondition.pathPatterns(['/mcp-server/duckdb/*']),
+        ],
+        priority: 40,
+        action: elbv2.ListenerAction.forward([mcpDuckDbTargetGroup]),
+      });
+    }
+
+    if (deployOpenSearchMcpServer && mcpOpenSearchTargetGroup) {
+      httpListener.addAction('McpOpenSearchAction', {
+        conditions: [
+          elbv2.ListenerCondition.pathPatterns(['/mcp-server/opensearch/*']),
+        ],
+        priority: 50,
+        action: elbv2.ListenerAction.forward([mcpOpenSearchTargetGroup]),
       });
     }
 
@@ -510,6 +657,56 @@ export class AgentXStack extends cdk.Stack {
       console.log('Redshift MCP server deployment is disabled');
     }
 
+    // Conditionally create DuckDB MCP service with Service Connect
+    let mcpDuckDbService: ecs.FargateService | undefined;
+    if (deployDuckDbMcpServer) {
+      mcpDuckDbService = new ecs.FargateService(this, 'McpDuckDbService', {
+        cluster,
+        taskDefinition: mcpDuckDbTaskDefinition,
+        desiredCount: 1,
+        securityGroups: [serviceSecurityGroup],
+        assignPublicIp: false,
+        serviceConnectConfiguration: {
+          namespace: 'agentx.ns',
+          services: [
+            {
+              portMappingName: 'mcp-duckdb-svr',
+              dnsName: 'mcp-duckdb',
+              port: 8000,
+            },
+          ],
+        },
+      });
+      console.log('DuckDB MCP server will be deployed');
+    } else {
+      console.log('DuckDB MCP server deployment is disabled');
+    }
+
+    // Conditionally create OpenSearch MCP service with Service Connect
+    let mcpOpenSearchService: ecs.FargateService | undefined;
+    if (deployOpenSearchMcpServer) {
+      mcpOpenSearchService = new ecs.FargateService(this, 'McpOpenSearchService', {
+        cluster,
+        taskDefinition: mcpOpenSearchTaskDefinition,
+        desiredCount: 1,
+        securityGroups: [serviceSecurityGroup],
+        assignPublicIp: false,
+        serviceConnectConfiguration: {
+          namespace: 'agentx.ns',
+          services: [
+            {
+              portMappingName: 'mcp-opensearch-svr',
+              dnsName: 'mcp-opensearch',
+              port: 3000,
+            },
+          ],
+        },
+      });
+      console.log('OpenSearch MCP server will be deployed');
+    } else {
+      console.log('OpenSearch MCP server deployment is disabled');
+    }
+
     // Register services with target groups
     beTargetGroup.addTarget(beService);
     feTargetGroup.addTarget(feService);
@@ -521,6 +718,14 @@ export class AgentXStack extends cdk.Stack {
     
     if (deployRedshiftMcpServer && mcpRedshiftService && mcpRedshiftTargetGroup) {
       mcpRedshiftTargetGroup.addTarget(mcpRedshiftService);
+    }
+    
+    if (deployDuckDbMcpServer && mcpDuckDbService && mcpDuckDbTargetGroup) {
+      mcpDuckDbTargetGroup.addTarget(mcpDuckDbService);
+    }
+    
+    if (deployOpenSearchMcpServer && mcpOpenSearchService && mcpOpenSearchTargetGroup) {
+      mcpOpenSearchTargetGroup.addTarget(mcpOpenSearchService);
     }
 
     // Output the load balancer DNS name

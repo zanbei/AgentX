@@ -1,0 +1,86 @@
+/* HTML Tabs Styling */
+
+.html-tabs-container {
+  margin: 10px 0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.html-tabs {
+  position: relative;
+  background-color: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+/* Hide the radio buttons */
+.html-tab-input {
+  display: none;
+}
+
+/* Style the tab labels */
+.html-tab-label {
+  display: inline-block;
+  padding: 8px 16px;
+  cursor: pointer;
+  background-color: #f0f0f0;
+  border-bottom: 1px solid #e0e0e0;
+  transition: background-color 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.html-tab-label:first-of-type {
+  border-top-left-radius: 4px;
+}
+
+.html-tab-label:last-of-type {
+  border-top-right-radius: 4px;
+}
+
+.html-tab-label:hover {
+  background-color: #e0e0e0;
+}
+
+/* Style the active tab label */
+.html-tab-input:checked + .html-tab-label {
+  background-color: #fff;
+  border-bottom: 2px solid #1890ff;
+  color: #1890ff;
+}
+
+/* Hide all tab content by default */
+.html-tab-content {
+  display: none;
+  padding: 16px;
+  background-color: #fff;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* Show the selected tab content */
+#html-tab-code:checked ~ .html-code-content,
+#html-tab-render:checked ~ .html-render-content,
+[id$="-code"]:checked ~ .html-code-content,
+[id$="-render"]:checked ~ .html-render-content {
+  display: block;
+}
+
+/* Style the HTML render frame */
+.html-render-frame {
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  padding: 16px;
+  background-color: #fff;
+  min-height: 100px;
+  overflow: auto;
+}
+
+/* Style for code content */
+.html-code-content pre {
+  margin: 0;
+  padding: 0;
+}
+
+.html-code-content code {
+  border-radius: 0;
+}

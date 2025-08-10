@@ -37,6 +37,16 @@ The project consists of the following deployable components:
    - Port: 3000
    - Path: `/mcp-server/redshift/*`
 
+5. **DuckDB MCP Server**: DuckDB Model Context Protocol server
+   - Container: `agentx/mcp-duckdb`
+   - Port: 8000
+   - Path: `/mcp-server/duckdb/*`
+
+6. **OpenSearch MCP Server**: OpenSearch Model Context Protocol server
+   - Container: `agentx/mcp-opensearch`
+   - Port: 3000
+   - Path: `/mcp-server/opensearch/*`
+
 ## 🚀 Deployment Steps
 
 ### 1. Prerequisites
@@ -69,6 +79,8 @@ aws ecr create-repository --repository-name agentx/be --region $AWS_REGION
 aws ecr create-repository --repository-name agentx/fe --region $AWS_REGION
 aws ecr create-repository --repository-name agentx/mcp-mysql --region $AWS_REGION
 aws ecr create-repository --repository-name agentx/mcp-redshift --region $AWS_REGION
+aws ecr create-repository --repository-name agentx/mcp-duckdb --region $AWS_REGION
+aws ecr create-repository --repository-name agentx/mcp-opensearch --region $AWS_REGION
 ```
 
 #### Step 2: Build and Push Docker Images
@@ -106,6 +118,8 @@ aws ecr describe-repositories --repository-names agentx/be --region $AWS_REGION 
 aws ecr describe-repositories --repository-names agentx/fe --region $AWS_REGION || aws ecr create-repository --repository-name agentx/fe --region $AWS_REGION
 aws ecr describe-repositories --repository-names agentx/mcp-mysql --region $AWS_REGION || aws ecr create-repository --repository-name agentx/mcp-mysql --region $AWS_REGION
 aws ecr describe-repositories --repository-names agentx/mcp-redshift --region $AWS_REGION || aws ecr create-repository --repository-name agentx/mcp-redshift --region $AWS_REGION
+aws ecr describe-repositories --repository-names agentx/mcp-duckdb --region $AWS_REGION || aws ecr create-repository --repository-name agentx/mcp-duckdb --region $AWS_REGION
+aws ecr describe-repositories --repository-names agentx/mcp-opensearch --region $AWS_REGION || aws ecr create-repository --repository-name agentx/mcp-opensearch --region $AWS_REGION
 
 # Build and push backend
 cd be
@@ -151,6 +165,8 @@ Available options:
 - `--vpc-id VPC_ID`: Use existing VPC ID instead of creating a new one
 - `--no-mysql-mcp`: Disable MySQL MCP server deployment
 - `--no-redshift-mcp`: Disable Redshift MCP server deployment
+- `--no-duckdb-mcp`: Disable DuckDB MCP server deployment
+- `--no-opensearch-mcp`: Disable OpenSearch MCP server deployment
 - `--no-dynamodb-tables`: Disable creation of DynamoDB tables
 
 ##### Option B: Manual CDK Deployment
@@ -238,6 +254,27 @@ const mcpRedshiftContainer = mcpRedshiftTaskDefinition.addContainer('McpRedshift
     RS_PASSWORD: 'your-redshift-password',
     RS_DATABASE: 'your-redshift-database',
     RS_SCHEMA: 'public',
+  },
+});
+
+const mcpDuckDbContainer = mcpDuckDbTaskDefinition.addContainer('McpDuckDbContainer', {
+  // ...
+  environment: {
+    PYTHON_ENV: 'production',
+    AWS_REGION: this.region,
+    PORT: '8000',
+  },
+});
+
+const mcpOpenSearchContainer = mcpOpenSearchTaskDefinition.addContainer('McpOpenSearchContainer', {
+  // ...
+  environment: {
+    NODE_ENV: 'production',
+    AWS_REGION: this.region,
+    OPENSEARCH_HOST: 'your-opensearch-host',
+    OPENSEARCH_PORT: '9200',
+    OPENSEARCH_USER: 'your-opensearch-user',
+    OPENSEARCH_PASSWORD: 'your-opensearch-password',
   },
 });
 ```

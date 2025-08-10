@@ -280,7 +280,7 @@ class AgentPOService:
         async for message in agent_instance.stream_async(user_message):
             # print(f"Received message: {message}")
             msg = EventSerializer.prepare_event_for_serialization(message)
-            print(f"Received message: {msg}")
+            # print(f"Received message: {msg}")
             # Return the complete event information instead of just the data field
             yield message
 

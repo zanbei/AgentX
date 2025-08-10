@@ -37,6 +37,8 @@ A React/TypeScript application built with:
 Model Context Protocol servers that extend agent capabilities:
 - **MySQL MCP**: Tools for interacting with MySQL databases
 - **Redshift MCP**: Tools for interacting with Amazon Redshift
+- **DuckDB MCP**: Tools for interacting with DuckDB databases
+- **OpenSearch MCP**: Tools for interacting with OpenSearch
 
 ## 🚀 Getting Started
 
@@ -59,17 +61,43 @@ Model Context Protocol servers that extend agent capabilities:
    ```bash
    cd be
    uv sync
-   uvicorn app.main:app --reload
+   source .venv/bin/python3
+   uvicorn app.main:app --reload --loop asyncio
    ```
 
-3. **Set up the frontend**:
+3. **Set up local DynamoDB tables**:
+   
+   For local development, you need to create the following DynamoDB tables:
+   
+   - **AgentTable**
+     - Partition key: `id` (String)
+   
+   - **ChatRecordTable**
+     - Partition key: `id` (String)
+   
+   - **ChatResponseTable**
+     - Partition key: `id` (String)
+     - Sort key: `resp_no` (Number)
+   
+   - **HttpMCPTable**
+     - Partition key: `id` (String)
+   
+   - **AgentScheduleTable**
+     - Partition key: `id` (String)
+   
+   You can use DynamoDB Local for development by running:
+   ```bash
+   docker run -p 8000:8000 amazon/dynamodb-local
+   ```
+
+4. **Set up the frontend**:
    ```bash
    cd fe
    bun install
    bun run dev
    ```
 
-4. **Set up MCP servers** (optional):
+5. **Set up MCP servers** (optional):
    ```bash
    # For MySQL MCP
    cd mcp/mysql
@@ -80,6 +108,14 @@ Model Context Protocol servers that extend agent capabilities:
    cd mcp/redshift
    uv sync
    python -m redshift_mcp_server --transport streamable-http --port 3001
+   
+   # For DuckDB MCP
+   cd mcp/duckdb
+   # Follow setup instructions in the directory
+   
+   # For OpenSearch MCP
+   cd mcp/opensearch
+   # Follow setup instructions in the directory
    ```
 
 ## 📦 Deployment
@@ -98,6 +134,8 @@ For detailed deployment instructions, see [README-DEPLOYMENT.md](README-DEPLOYME
 - [Frontend Documentation](fe/README.md)
 - [MySQL MCP Server Documentation](mcp/mysql/README.md)
 - [Redshift MCP Server Documentation](mcp/redshift/README.md)
+- [DuckDB MCP Server Documentation](mcp/duckdb/README.md)
+- [OpenSearch MCP Server Documentation](mcp/opensearch/README.md)
 
 ## 🛠️ Technologies
 

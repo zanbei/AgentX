@@ -38,7 +38,7 @@ export const ChatList: React.FC<ChatListProps> = ({ onSubmit }) => {
             typing: i.status === 'loading' ? { step: 5, interval: 20, suffix: <>💗</> } : false,
             content: <div className="markdown-content" dangerouslySetInnerHTML={{ __html: i.message.content as string }} />,
           }))}
-          style={{ height: '100%', paddingInline: 'calc(calc(100% - 700px) /2)' }}
+          style={{ height: '100%', paddingInline: 'calc(calc(100% - 900px) /2)' }}
           roles={{
             assistant: {
               placement: 'start',
@@ -59,7 +59,7 @@ export const ChatList: React.FC<ChatListProps> = ({ onSubmit }) => {
         <Space
           direction="vertical"
           size={16}
-          style={{ paddingInline: 'calc(calc(100% - 700px) /2)' }}
+          style={{ paddingInline: 'calc(calc(100% - 900px) /2)' }}
           className={styles.placeholder}
         >
           <Welcome

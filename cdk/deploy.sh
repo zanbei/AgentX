@@ -11,6 +11,8 @@ usage() {
   echo "  --vpc-id VPC_ID             Use existing VPC ID instead of creating a new one"
   echo "  --no-mysql-mcp              Disable MySQL MCP server deployment"
   echo "  --no-redshift-mcp           Disable Redshift MCP server deployment"
+  echo "  --no-duckdb-mcp             Disable DuckDB MCP server deployment"
+  echo "  --no-opensearch-mcp         Disable OpenSearch MCP server deployment"
   echo "  --no-dynamodb-tables        Disable creation of DynamoDB tables for agent and MCP services"
   echo "  --help                      Display this help message"
   exit 1
@@ -21,6 +23,8 @@ AWS_REGION=$(aws configure get region || echo "us-west-2")
 VPC_ID=""
 DEPLOY_MYSQL_MCP=true
 DEPLOY_REDSHIFT_MCP=true
+DEPLOY_DUCKDB_MCP=true
+DEPLOY_OPENSEARCH_MCP=true
 CREATE_DYNAMODB_TABLES=true
 
 # Parse arguments
@@ -40,6 +44,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-redshift-mcp)
       DEPLOY_REDSHIFT_MCP=false
+      shift
+      ;;
+    --no-duckdb-mcp)
+      DEPLOY_DUCKDB_MCP=false
+      shift
+      ;;
+    --no-opensearch-mcp)
+      DEPLOY_OPENSEARCH_MCP=false
       shift
       ;;
     --no-dynamodb-tables)
@@ -68,6 +80,8 @@ if [ -n "$VPC_ID" ]; then
 fi
 echo "MySQL MCP server deployment: $([ "$DEPLOY_MYSQL_MCP" = true ] && echo "Enabled" || echo "Disabled")"
 echo "Redshift MCP server deployment: $([ "$DEPLOY_REDSHIFT_MCP" = true ] && echo "Enabled" || echo "Disabled")"
+echo "DuckDB MCP server deployment: $([ "$DEPLOY_DUCKDB_MCP" = true ] && echo "Enabled" || echo "Disabled")"
+echo "OpenSearch MCP server deployment: $([ "$DEPLOY_OPENSEARCH_MCP" = true ] && echo "Enabled" || echo "Disabled")"
 echo "DynamoDB tables creation: $([ "$CREATE_DYNAMODB_TABLES" = true ] && echo "Enabled" || echo "Disabled")"
 echo "Agent Schedule functionality: Enabled"
 
@@ -105,6 +119,16 @@ fi
 if [ "$DEPLOY_REDSHIFT_MCP" = false ]; then
   CDK_PARAMS="$CDK_PARAMS -c deployRedshiftMcpServer=false"
   export DEPLOY_REDSHIFT_MCP=false
+fi
+
+if [ "$DEPLOY_DUCKDB_MCP" = false ]; then
+  CDK_PARAMS="$CDK_PARAMS -c deployDuckDbMcpServer=false"
+  export DEPLOY_DUCKDB_MCP=false
+fi
+
+if [ "$DEPLOY_OPENSEARCH_MCP" = false ]; then
+  CDK_PARAMS="$CDK_PARAMS -c deployOpenSearchMcpServer=false"
+  export DEPLOY_OPENSEARCH_MCP=false
 fi
 
 if [ "$CREATE_DYNAMODB_TABLES" = false ]; then

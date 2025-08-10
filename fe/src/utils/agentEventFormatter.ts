@@ -121,6 +121,22 @@ const detectContentFormat = (content: string): 'json' | 'markdown' | 'sql' | 'ht
   return 'text';
 };
 
+// Helper function to extract HTML code blocks from markdown text
+const extractHtmlCodeBlocks = (text: string): { htmlCode: string, fullMatch: string }[] => {
+  const regex = /```html\s*([\s\S]*?)```/g;
+  const matches: { htmlCode: string, fullMatch: string }[] = [];
+  let match;
+  
+  while ((match = regex.exec(text)) !== null) {
+    matches.push({
+      htmlCode: match[1],
+      fullMatch: match[0]
+    });
+  }
+  
+  return matches;
+};
+
 // Format message event
 const formatMessageEvent = (event: MessageEvent): string => {
   const message = event.message;
@@ -128,7 +144,53 @@ const formatMessageEvent = (event: MessageEvent): string => {
   
   message.content.forEach((content, index) => {
     if (content.text) {
-      result += content.text;
+      const text = content.text;
+      // Check if the text contains HTML code blocks
+      const htmlBlocks = extractHtmlCodeBlocks(text);
+      
+      if (htmlBlocks.length > 0) {
+        // Process text with HTML code blocks
+        let processedText = text;
+        
+        // Replace each HTML code block with tabbed content
+        htmlBlocks.forEach((block, blockIndex) => {
+          // Clean up the HTML code by removing empty lines
+          const cleanedHtmlCode = block.htmlCode
+            .replace(/^\s*[\r\n]/gm, '') // Remove empty lines
+            .replace(/\n\s*\n/g, '\n')   // Replace multiple newlines with a single one
+            .trim();                     // Trim whitespace from beginning and end
+          
+          // Create a unique ID for this HTML block
+          const htmlBlockId = `html-block-${Date.now()}-${blockIndex}-${Math.floor(Math.random() * 10000)}`;
+          
+          // Create the tabbed interface - Note: We're not escaping the HTML structure itself
+          // Only the code content in the HTML tab is escaped
+          const tabsHtml = `
+<div class="html-tabs-container">
+  <div class="html-tabs">
+    <input type="radio" name="${htmlBlockId}" id="${htmlBlockId}-render" class="html-tab-input" checked>
+    <label for="${htmlBlockId}-render" class="html-tab-label">Web</label>
+    <input type="radio" name="${htmlBlockId}" id="${htmlBlockId}-code" class="html-tab-input">
+    <label for="${htmlBlockId}-code" class="html-tab-label">HTML</label>
+    <div class="html-tab-content html-code-content">
+      <pre><code class="language-html">${escapeHtml(cleanedHtmlCode)}</code></pre>
+    </div>
+    <div class="html-tab-content html-render-content">
+      <iframe style="width: 100%; height: 500px; border: none;" sandbox="allow-scripts allow-same-origin"
+      srcdoc='${escapeHtml(cleanedHtmlCode)}'>
+      </iframe>
+    </div>
+  </div>
+</div>`;
+          // Replace the original HTML code block with the tabbed interface
+          processedText = processedText.replace(block.fullMatch, tabsHtml);
+        });
+        
+        result += processedText;
+      } else {
+        // No HTML code blocks, just add the text as is
+        result += text;
+      }
     }
     
     if (content.toolUse) {

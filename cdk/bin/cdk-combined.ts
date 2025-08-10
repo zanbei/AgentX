@@ -12,6 +12,8 @@ const app = new cdk.App();
 const vpcId = app.node.tryGetContext('vpcId') || process.env.VPC_ID;
 const deployMysqlMcpServer = app.node.tryGetContext('deployMysqlMcpServer') !== 'false' && process.env.DEPLOY_MYSQL_MCP !== 'false';
 const deployRedshiftMcpServer = app.node.tryGetContext('deployRedshiftMcpServer') !== 'false' && process.env.DEPLOY_REDSHIFT_MCP !== 'false';
+const deployDuckDbMcpServer = app.node.tryGetContext('deployDuckDbMcpServer') !== 'false' && process.env.DEPLOY_DUCKDB_MCP !== 'false';
+const deployOpenSearchMcpServer = app.node.tryGetContext('deployOpenSearchMcpServer') !== 'false' && process.env.DEPLOY_OPENSEARCH_MCP !== 'false';
 const createDynamoDBTables = app.node.tryGetContext('createDynamoDBTables') !== 'false' && process.env.CREATE_DYNAMODB_TABLES !== 'false';
 
 // Create the combined AgentX stack
@@ -25,6 +27,8 @@ new AgentXStack(app, 'AgentXStack', {
   vpcId: vpcId,
   deployMysqlMcpServer: deployMysqlMcpServer,
   deployRedshiftMcpServer: deployRedshiftMcpServer,
+  deployDuckDbMcpServer: deployDuckDbMcpServer,
+  deployOpenSearchMcpServer: deployOpenSearchMcpServer,
   createDynamoDBTables: createDynamoDBTables,
 });
 
@@ -34,4 +38,6 @@ console.log(vpcId
   : 'No VPC ID provided. A new VPC will be created.');
 console.log(`MySQL MCP server deployment: ${deployMysqlMcpServer ? 'Enabled' : 'Disabled'}`);
 console.log(`Redshift MCP server deployment: ${deployRedshiftMcpServer ? 'Enabled' : 'Disabled'}`);
+console.log(`DuckDB MCP server deployment: ${deployDuckDbMcpServer ? 'Enabled' : 'Disabled'}`);
+console.log(`OpenSearch MCP server deployment: ${deployOpenSearchMcpServer ? 'Enabled' : 'Disabled'}`);
 console.log(`DynamoDB tables creation: ${createDynamoDBTables ? 'Enabled' : 'Disabled'}`);
