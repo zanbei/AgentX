@@ -1,12 +1,14 @@
 from datetime import datetime
 import uuid
 import json
-
-from fastapi import APIRouter, Request, BackgroundTasks
+import os
+import boto3
+from fastapi import APIRouter, Request, BackgroundTasks, UploadFile, File
 from fastapi.responses import StreamingResponse, JSONResponse
 from typing import List, Dict, Tuple, Optional, AsyncGenerator
 from ..agent.agent import AgentPO, AgentType, ModelProvider, AgentTool, AgentPOService, ChatRecord, ChatResponse, ChatRecordService
 from ..agent.event_serializer import EventSerializer
+from ..utils.aws_config import get_aws_region
 
 agent_service = AgentPOService()
 chat_reccord_service = ChatRecordService()
@@ -16,6 +18,69 @@ router = APIRouter(
     tags=["agent"],
     responses={404: {"description": "Not found"}}
 )
+
+@router.post("/upload")
+async def upload_file(file: UploadFile = File(...)) -> Dict[str, str]:
+    """
+    Upload a file to S3, create a chat record, and return both S3 path and chat ID.
+    """
+    print(f"Uploading file: {file.filename}, Content-Type: {file.content_type}")
+    try:
+        # Initialize S3 client
+        s3 = boto3.client('s3', region_name=get_aws_region())
+        bucket_name = 'a-web-uw2' # Replace with your actual bucket name
+        print(f"S3 client initialized for bucket: {bucket_name}")
+        s3_key = f'agentx/{file.filename}'
+        
+        # Read file content
+        content = await file.read()
+        content_size = len(content)
+        print(f"Read file content, size: {content_size} bytes")
+        
+        # Create a file-like object from the content
+        from io import BytesIO
+        file_obj = BytesIO(content)
+        file_obj.seek(0)  # Ensure file pointer is at the beginning
+        
+        # Upload file to S3
+        print(f"Uploading to S3: bucket={bucket_name}, key={s3_key}")
+        s3.upload_fileobj(
+            file_obj,
+            bucket_name,
+            s3_key,
+            ExtraArgs={'ContentType': file.content_type}
+        )
+        print("S3 upload completed successfully")
+        
+        # Create chat record
+        chat_id = uuid.uuid4().hex
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        s3_path = f's3://{bucket_name}/{s3_key}'
+        
+        chat_record = ChatRecord(
+            id=chat_id,
+            agent_id="file_upload",  # Special agent ID for file uploads
+            user_message=f"File uploaded: {s3_path}",
+            create_time=current_time
+        )
+        chat_reccord_service.add_chat_record(chat_record)
+        
+        # Create chat response with S3 path
+        chat_resp = ChatResponse(
+            chat_id=chat_id,
+            resp_no=0,
+            content=s3_path,
+            create_time=current_time
+        )
+        chat_reccord_service.add_chat_response(chat_resp)
+        
+        return {
+            "s3_path": s3_path,
+            "chat_id": chat_id
+        }
+        
+    except Exception as e:
+        raise Exception(f"Failed to upload file to S3: {str(e)}")
 
 @router.get("/list")
 def list_agents() -> List[AgentPO]:
@@ -88,6 +153,12 @@ async def parse_chat_request_and_add_record(request: Request) -> Tuple[Optional[
     agent_id = data.get("agent_id")
     user_message = data.get("user_message")
     chat_record_enabled = data.get("chat_record_enabled", True)  # Default to True if not provided
+    
+    # Log the received message content
+    print(f"Received chat request - Agent ID: {agent_id}")
+    print(f"User message content: {user_message}")
+    if user_message and "File Content:" in user_message:
+        print("Message includes uploaded file content")
     
     # Create a chat record if chat_record_enabled is True
     chat_id = uuid.uuid4().hex

@@ -42,7 +42,12 @@ export const useAgent = () => {
       
       // Call the stream_chat API with the correct parameters
       console.log('Sending request with agent ID:', currentSelectedAgent.id);
-      console.log('User message:', info.message);
+      console.log('User message content:', info.message.content);
+      
+      // Log if message contains file content
+      if (info.message.content.includes('File Content:')) {
+        console.log('Message includes uploaded file content');
+      }
       
       // Get the chatRecordEnabled value from the store
       const chatRecordEnabled = useChatStore.getState().chatRecordEnabled;

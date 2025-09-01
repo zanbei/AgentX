@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
-import { Flex, Space, Typography, Switch, Divider } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Flex, Space, Typography, Switch, Divider, Upload, message } from 'antd';
+import { UserOutlined, UploadOutlined } from '@ant-design/icons';
 import { Sender, Suggestion } from '@ant-design/x';
-import { UserOutlined } from '@ant-design/icons';
 import { useStyles } from '../../styles';
 import { useChatStore } from '../../store';
-import type { Agent } from '../../services/api';
+import { chatAPI, type Agent } from '../../services/api';
 
 interface ChatInputProps {
   onSubmit: (text: string) => void;
@@ -30,18 +30,67 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onCancel, loadin
     fetchAgents();
   }, [fetchAgents]);
 
+  const [fileContent, setFileContent] = useState<string>('');
+
   const handleSubmit = () => {
     if (!inputValue) return;
     
     // Check if agent is selected
     if (!selectedAgent) {
-      // message.warning('Please select an agent first');
+      message.warning('Please select an agent first');
       return;
     }
     
     onSubmit(inputValue);
     setInputValue('');
+  };
 
+  const handleFileUpload = async (file: File) => {
+    try {
+      // Check if agent is selected
+      if (!selectedAgent) {
+        message.warning('Please select an agent first');
+        return false;
+      }
+
+      // Create form data for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Upload file to get temporary path
+      const response = await fetch('/api/agent/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('File upload failed');
+      }
+
+      const data = await response.json();
+      console.log('Upload response:', data); // Debug log
+      
+      if (data.chat_id) {
+        // Get file content using chat ID
+        const content = await chatAPI.getFileContent(data.chat_id);
+        setFileContent(content);
+        
+        // Set content to input value for user to edit
+        setInputValue(`File content: ${content}`);
+        
+        // Notify user they can now edit and send the message
+        message.success(`File "${file.name}" processed successfully. You can now edit and send the message.`);
+      } else {
+        // Fallback to original behavior if chat_id is not available
+        setInputValue(`File uploaded to ${data.s3_path}`);
+        message.success(`File "${file.name}" uploaded successfully. You can now edit and send the message.`);
+      }
+    } catch (error) {
+      message.error('Failed to process file');
+      console.error('File processing error:', error);
+    }
+
+    return false; // Prevent default upload behavior
   };
   
   // Handle agent selection from suggestion
@@ -125,6 +174,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, onCancel, loadin
                             setChatRecordEnabled(checked);
                           }}
                         />
+                        <Upload
+                          beforeUpload={handleFileUpload}
+                          showUploadList={false}
+                          accept=".txt,.csv,.docx,.pdf,.jpg,.jpeg,.png,.gif"
+                        >
+                          <Space>
+                            <UploadOutlined />
+                            Upload file
+                          </Space>
+                        </Upload>
                       </Space>
                     </Flex>
                     <Flex align="center">

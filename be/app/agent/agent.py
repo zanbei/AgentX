@@ -1,7 +1,8 @@
 import boto3, uuid
 import importlib
 import json
-
+import os
+os.environ["BYPASS_TOOL_CONSENT"] = "true"
 from boto3.dynamodb.conditions import Attr
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -359,10 +360,21 @@ class AgentPOService:
                 agent_po = self.get_agent(t.agent_id)
                 tools.append(agent_as_tool(agent_po))
             elif t.type == AgentToolType.mcp and t.mcp_server_url:
-                # If the tool is an MCP server, create a Strands MCP client
-                streamable_http_mcp_client = MCPClient(lambda: streamablehttp_client(t.mcp_server_url))
-                streamable_http_mcp_client = streamable_http_mcp_client.start()
-                tools.extend(streamable_http_mcp_client.list_tools_sync())
+                try:
+                    # If the tool is an MCP server, create a Strands MCP client with increased timeout
+                    print(f"Initializing MCP client for server: {t.mcp_server_url}")
+                    streamable_http_mcp_client = MCPClient(
+                        lambda: streamablehttp_client(t.mcp_server_url),
+                        startup_timeout=60  # Increase timeout to 60 seconds
+                    )
+                    streamable_http_mcp_client = streamable_http_mcp_client.start()
+                    mcp_tools = streamable_http_mcp_client.list_tools_sync()
+                    print(f"Successfully loaded {len(mcp_tools)} tools from MCP server")
+                    tools.extend(mcp_tools)
+                except Exception as e:
+                    print(f"Error initializing MCP client for {t.mcp_server_url}: {str(e)}")
+                    # Continue without the MCP tools rather than failing completely
+                    continue
             else:
                 print(f"Unsupported tool type: {t.type}")
         
@@ -571,14 +583,20 @@ class ChatRecordService:
             record.id = uuid.uuid4().hex
         
         table = self.dynamodb.Table(self.chat_record_table_name)
-        table.put_item(
-            Item={
-                'id': record.id,
-                'agent_id': record.agent_id,
-                'user_message': record.user_message,
-                'create_time': record.create_time
-            }   
-        )
+        try:
+            table.put_item(
+                Item={
+                    'id': record.id,
+                    'agent_id': record.agent_id,
+                    'user_message': record.user_message,
+                    'create_time': record.create_time
+                }   
+            )
+            # print(f"Successfully wrote chat record to DynamoDB. {self.chat_record_table_name} ID: {record.id}")
+        except Exception as e:
+            print(f"Error writing chat record to DynamoDB. ID: {record.id}")
+            print(f"Error details: {str(e)}")
+            raise
     
     def get_chat_record(self, id: str) -> ChatRecord:
         """
@@ -617,14 +635,20 @@ class ChatRecordService:
         :param response: The ChatResponse object to add.
         """
         table = self.dynamodb.Table(self.chat_response_table_name)
-        table.put_item(
-            Item={
-                'id': response.chat_id,
-                'resp_no': response.resp_no,
-                'content': response.content,
-                'create_time': response.create_time
-            }
-        )
+        try:
+            table.put_item(
+                Item={
+                    'id': response.chat_id,
+                    'resp_no': response.resp_no,
+                    'content': response.content,
+                    'create_time': response.create_time
+                }
+            )
+            print(f"Successfully wrote chat response to DynamoDB. Chat ID: {response.chat_id}, Response No: {response.resp_no}")
+        except Exception as e:
+            print(f"Error writing chat response to DynamoDB. Chat ID: {response.chat_id}, Response No: {response.resp_no}")
+            print(f"Error details: {str(e)}")
+            raise
 
     def get_all_chat_responses(self, chat_id: str) -> List[ChatResponse]:
         """

@@ -61,7 +61,7 @@ Model Context Protocol servers that extend agent capabilities:
    ```bash
    cd be
    uv sync
-   source .venv/bin/python3
+   source /Users/anbei/Desktop/AgentX/be/.venv/bin/activate
    uvicorn app.main:app --reload --loop asyncio
    ```
 

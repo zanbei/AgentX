@@ -29,3 +29,20 @@ def list_chat_responses(chat_id: str) -> List[ChatResponse]:
 @router.delete("/del_chat")
 def del_chat(chat_id: str):
     chat_service.del_chat(chat_id)
+
+@router.get("/get_file_content")
+def get_file_content(chat_id: str) -> str:
+    """
+    Get file content from ChatResponse using chat_id.
+    The content is stored in the first response (resp_no=0).
+    """
+    responses = chat_service.get_all_chat_responses(chat_id)
+    if not responses:
+        return ""
+    
+    # Get the first response which contains the S3 path
+    first_response = next((r for r in responses if r.resp_no == 0), None)
+    if not first_response:
+        return ""
+    
+    return first_response.content

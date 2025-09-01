@@ -17,6 +17,8 @@ const CHAT_API = {
   listRecords: `${BASE_URL}/chat/list_record`,
   listResponses: (chatId: string) => `${BASE_URL}/chat/list_chat_responses?chat_id=${chatId}`,
   deleteChat: (chatId: string) => `${BASE_URL}/chat/del_chat?chat_id=${chatId}`,
+  uploadFile: `${BASE_URL}/agent/upload`,
+  getFileContent: (chatId: string) => `${BASE_URL}/chat/get_file_content?chat_id=${chatId}`,
 };
 
 // MCP API endpoints
@@ -417,6 +419,31 @@ export const chatAPI = {
     } catch (error) {
       console.error(`Error deleting chat with ID ${chatId}:`, error);
       return false;
+    }
+  },
+
+  // Upload file and get chat ID
+  uploadFile: async (file: File): Promise<{ chat_id: string; s3_path: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await axios.post(CHAT_API.uploadFile, formData);
+      return response.data;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      throw error;
+    }
+  },
+
+  // Get file content from S3 using chat ID
+  getFileContent: async (chatId: string): Promise<string> => {
+    try {
+      const response = await axios.get(CHAT_API.getFileContent(chatId));
+      return response.data;
+    } catch (error) {
+      console.error('Error getting file content:', error);
+      throw error;
     }
   }
 };
