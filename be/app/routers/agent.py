@@ -52,30 +52,42 @@ async def upload_file(file: UploadFile = File(...)) -> Dict[str, str]:
         )
         print("S3 upload completed successfully")
         
-        # Create chat record
+        # Generate chat ID
         chat_id = uuid.uuid4().hex
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         s3_path = f's3://{bucket_name}/{s3_key}'
         
+        # Save file locally
+        file_ext = os.path.splitext(file.filename)[1]
+        local_file_path = f"/Users/anbei/Desktop/AgentX/be/uploads/{chat_id}{file_ext}"
+        # Ensure the uploads directory exists
+        os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+        # Create a new BytesIO object for local file save
+        local_file_obj = BytesIO(content)
+        with open(local_file_path, "wb") as f:
+            f.write(local_file_obj.read())
+        print(f"File saved locally at: {local_file_path}")
+        
         chat_record = ChatRecord(
             id=chat_id,
             agent_id="file_upload",  # Special agent ID for file uploads
-            user_message=f"File uploaded: {s3_path}",
+            user_message=f"File uploaded: {local_file_path}",
             create_time=current_time
         )
         chat_reccord_service.add_chat_record(chat_record)
         
-        # Create chat response with S3 path
+        # Create chat response with both paths
         chat_resp = ChatResponse(
             chat_id=chat_id,
             resp_no=0,
-            content=s3_path,
+            content=local_file_path,  # Store local path for agent to use
             create_time=current_time
         )
         chat_reccord_service.add_chat_response(chat_resp)
         
         return {
             "s3_path": s3_path,
+            "file_path": local_file_path,
             "chat_id": chat_id
         }
         
